@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "756959569323",
+    "project_id": "cleaning-schedule-14317",
+    "storage_bucket": "cleaning-schedule-14317.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:756959569323:android:32e6f411df380364ae9eee",
+        "android_client_info": {
+          "package_name": "com.web82ORTA.cleaningschedule"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCUehIlCS2XFMC1EHnU2mUQwKz40PH_81A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

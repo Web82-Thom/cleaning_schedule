@@ -1,4 +1,4 @@
-package com.example.cleaning_schedule
+package com.web82ORTA.cleaningschedule
 
 import io.flutter.embedding.android.FlutterActivity
 
