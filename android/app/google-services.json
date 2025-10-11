@@ -12,7 +12,20 @@
           "package_name": "com.web82ORTA.cleaningschedule"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "756959569323-nvcgaqhriqpkt5vleffqjjgv1jfmcp2s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.web82ORTA.cleaningschedule",
+            "certificate_hash": "dd28c7b4e2d4cf3631f936e82f063f67a488d9da"
+          }
+        },
+        {
+          "client_id": "756959569323-4hvb2ssq3hov4bq56kqfdil5p1s7jctt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCUehIlCS2XFMC1EHnU2mUQwKz40PH_81A"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "756959569323-4hvb2ssq3hov4bq56kqfdil5p1s7jctt.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "756959569323-f9bcud3qlbs2p0ssbppgeo6bkvn79a9o.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.web82ORTA.cleaningschedule"
+              }
+            }
+          ]
         }
       }
     }

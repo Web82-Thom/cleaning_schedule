@@ -33,6 +33,10 @@ migrate_working_dir/
 /build/
 /coverage/
 lib/firebase_options.dart
+# Fichiers générés automatiquement par Flutter
+macos/Flutter/GeneratedPluginRegistrant.swift
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugins.cmake
 
 # Symbolication related
 app.*.symbols
