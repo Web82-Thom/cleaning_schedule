@@ -1,6 +1,5 @@
-import 'package:cleaning_schedule/screens/places/created_place.dart';
-import 'package:cleaning_schedule/screens/places/details_place_page.dart';
 import 'package:cleaning_schedule/screens/places/list_place_page.dart';
+import 'package:cleaning_schedule/screens/workers/list_workers_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -60,6 +59,8 @@ class CleaningScheduleApp extends StatelessWidget {
         home: const AuthWrapper(),
         routes: {
         '/listPlace': (context) => const ListPlace(),
+        '/workers': (context) => const ListWorkersPage(),
+
         // '/detailsPlace': (context) => const DetailsPlacePage(),
 },
       ),

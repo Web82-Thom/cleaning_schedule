@@ -42,7 +42,7 @@ class _EditPlanningPageState extends State<EditPlanningPage> {
               title: "Travailleurs",
               description: "Gérer les travailleurs en situation de handicap",
               color: Colors.purple.shade100,
-              onTap: () => Navigator.pushNamed(context, '/travailleurs'),
+              onTap: () => Navigator.pushNamed(context, '/workers'),
             ),
           ],
         ),
