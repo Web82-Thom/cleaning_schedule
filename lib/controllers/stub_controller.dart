@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cleaning_schedule/screens/planning/edit_planning_page.dart';
 
-class StubController extends ChangeNotifier{
-  ///Index pour les stubPages
-  // int selectedIndex = 0;
-
+class StubController extends ChangeNotifier {
   void onFabPressed(BuildContext context) {
-    // TODO: ouvrir la page/modal pour créer ou éditer un planning
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Ouvrir création / édition de planning')),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const EditPlanningPage()),
     );
   }
 }
