@@ -24,9 +24,10 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
   DateTime? _selectedDate;
   String _timeSlot = 'morning';
   String? _selectedPlace;
-  String? _selectedSubPlace;
+  List<String> _selectedSubPlaces = [];
+
   String _task = '';
-  List<String> _selectedWorkers = [];
+  final List<String> _selectedWorkers = [];
 
   // Data from Firestore
   List<Map<String, dynamic>> _places = [];
@@ -70,8 +71,6 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
   print('✅ Sous-lieux map : $_subPlacesMap');
 }
 
-
-
   Future<void> _loadWorkers() async {
     final snapshot = await workersRef.where('active', isEqualTo: true).get();
     setState(() {
@@ -81,7 +80,13 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
       }).toList();
     });
   }
-
+  ///Recupere le numero de la semaine
+  int _getWeekNumber(DateTime date) {
+  final firstDayOfYear = DateTime(date.year, 1, 1);
+  final daysOffset = firstDayOfYear.weekday - DateTime.monday;
+  final firstMonday = firstDayOfYear.subtract(Duration(days: daysOffset));
+  return ((date.difference(firstMonday).inDays) / 7).ceil() + 1;
+}
   Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() != true) return;
     if (_selectedDate == null || _selectedPlace == null) {
@@ -99,10 +104,11 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
       day: _selectedDate!,
       timeSlot: _timeSlot,
       place: _selectedPlace!,
-      subPlace: _selectedSubPlace,
+      subPlace: _selectedSubPlaces.toString(),
       task: _task,
       workerIds: _selectedWorkers,
       createdAt: Timestamp.now(),
+      weekNumber: _getWeekNumber(_selectedDate!)
     );
 
     await eventsRef.add(event.toFirestore());
@@ -182,35 +188,73 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
                 onChanged: (v) {
                   setState(() {
                     _selectedPlace = v?.toString().trim();
-                    _selectedSubPlace = null;
+                    _selectedSubPlaces = [];
                   });
                 },
                 validator: (v) => v == null ? 'Sélectionner un lieu' : null,
               ),
               const SizedBox(height: 16),
 
-              // Sous-lieu dropdown si existant
-              if (_selectedPlace != null &&
-                  (_subPlacesMap[_selectedPlace!] ?? []).isNotEmpty)
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Sous-lieu (optionnel)',
-                    border: OutlineInputBorder(),
-                  ),
-                  value: _selectedSubPlace,
-                  items: (_subPlacesMap[_selectedPlace!] ?? [])
-                      .map((sub) => DropdownMenuItem(
-                            value: sub,
-                            child: Text(sub),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    setState(() {
-                      _selectedSubPlace = v?.toString();
-                    });
-                  },
+              // 🔹 Sélecteur multiple de sous-lieux
+if (_selectedPlace != null &&
+    (_subPlacesMap[_selectedPlace!] ?? []).isNotEmpty) ...[
+  InputDecorator(
+    decoration: const InputDecoration(
+      labelText: 'Sous-lieux (optionnels)',
+      border: OutlineInputBorder(),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          children: (_subPlacesMap[_selectedPlace!] ?? []).map((sub) {
+            final isSelected = _selectedSubPlaces.contains(sub);
+            return FilterChip(
+              label: Text(sub),
+              selected: isSelected,
+              selectedColor: Colors.blue.shade100,
+              onSelected: (selected) {
+                setState(() {
+                  if (selected) {
+                    _selectedSubPlaces.add(sub);
+                  } else {
+                    _selectedSubPlaces.remove(sub);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+        if (_selectedSubPlaces.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'Aucun sous-lieu sélectionné',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sous-lieux sélectionnés :',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 4),
+                ..._selectedSubPlaces.map((sub) => Text('• $sub')),
+              ],
+            ),
+          ),
+      ],
+    ),
+  ),
+  const SizedBox(height: 16),
+],
+
 
 //               // Sous-lieu dropdown si existant
 // if (_selectedPlace != null && _subPlacesMap.containsKey(_selectedPlace))
@@ -234,11 +278,9 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
               // Tâche
               TextFormField(
                 decoration: const InputDecoration(
-                  labelText: 'Tâche',
+                  labelText: 'Tâche (optionnelle)',
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? 'Veuillez entrer une tâche' : null,
                 onSaved: (v) => _task = v ?? '',
               ),
               const SizedBox(height: 16),
