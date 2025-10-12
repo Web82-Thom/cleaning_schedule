@@ -190,14 +190,37 @@ class _ListWorkersPageState extends State<ListWorkersPage> {
 
   /// 🧾 Supprimer un travailleur
   Future<void> _deleteWorker(String id) async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Confirmation'),
+        content: const Text('Êtes-vous sûr de vouloir supprimer ce travailleur ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Non'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Oui'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirm == true) {
     await workersRef.doc(id).delete();
 
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Travailleur supprimé ❌')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Travailleur supprimé ❌')),
+      );
     }
   }
+}
+
 
   /// 🟢 Couleur du statut selon le type
   Color _getStatusColor(Map<String, dynamic> data) {

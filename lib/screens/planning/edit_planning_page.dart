@@ -26,7 +26,7 @@ class _EditPlanningPageState extends State<EditPlanningPage> {
               title: "Créer un planning",
               description: "Créer un nouveau planning hebdomadaire",
               color: Colors.orange.shade100,
-              onTap: () => Navigator.pushNamed(context, '/createPlanning'),
+              onTap: () => Navigator.pushNamed(context, '/createdPlanning'),
             ),
             const SizedBox(height: 12),
             _buildCard(

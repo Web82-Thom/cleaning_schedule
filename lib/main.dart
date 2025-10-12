@@ -1,4 +1,5 @@
 import 'package:cleaning_schedule/screens/places/list_place_page.dart';
+import 'package:cleaning_schedule/screens/planning/created_event_page.dart';
 import 'package:cleaning_schedule/screens/workers/list_workers_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -60,6 +61,7 @@ class CleaningScheduleApp extends StatelessWidget {
         routes: {
         '/listPlace': (context) => const ListPlace(),
         '/workers': (context) => const ListWorkersPage(),
+        '/createdPlanning': (context) => const CreatedEventPage(),
 
         // '/detailsPlace': (context) => const DetailsPlacePage(),
 },

@@ -56,7 +56,6 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       body: _pages[_selectedIndex],
-
       // FAB centré
       floatingActionButton: FloatingActionButton(
         onPressed: () => stubController.onFabPressed(context),
@@ -65,7 +64,6 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.indigo,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-
       // BottomAppBar avec notch pour FAB
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
