@@ -1,3 +1,4 @@
+import 'package:cleaning_schedule/screens/planning/edit_event_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -110,8 +111,17 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                 ),
               ),
             )
-            .where('day',isLessThanOrEqualTo: Timestamp.fromDate(
-              DateTime(_endOfWeek.year, _endOfWeek.month, _endOfWeek.day, 23, 59, 59,),
+            .where(
+              'day',
+              isLessThanOrEqualTo: Timestamp.fromDate(
+                DateTime(
+                  _endOfWeek.year,
+                  _endOfWeek.month,
+                  _endOfWeek.day,
+                  23,
+                  59,
+                  59,
+                ),
               ),
             )
             .snapshots(),
@@ -123,6 +133,7 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
           final events = snapshot.data!.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             return {
+              'id': doc.id,
               'day': (data['day'] as Timestamp).toDate(),
               'timeSlot': data['timeSlot'],
               'place': data['place'],
@@ -154,7 +165,7 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                   // 🔹 En-tête des jours
                   Row(
                     children: [
-                      const SizedBox(width: 120),
+                      const SizedBox(width: 40),
                       ...days.map(
                         (d) => Container(
                           width: 180,
@@ -175,15 +186,22 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          width: 120,
-                          alignment: Alignment.center,
+                          width: 40,
+                          height: 330,
                           color: Colors.grey.shade300,
-                          padding: const EdgeInsets.all(8),
-                          child: Text(
-                            period == 'morning' ? 'MATIN' : 'APRÈS-MIDI',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                          child: Center(
+                            child: Transform.rotate(
+                              angle: -3.14 / 2,
+                              child: Text(
+                                period == 'morning' ? 'MATIN' : 'APRÈS-MIDI',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                                softWrap: false,
+                                overflow: TextOverflow.visible,
+                              ),
                             ),
                           ),
                         ),
@@ -194,7 +212,7 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
 
                           return Container(
                             width: 180,
-                            height: 180,
+                            height: 330,
                             margin: const EdgeInsets.all(2),
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
@@ -212,10 +230,9 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                                   )
                                 : ListView(
                                     children: cellEvents.map((e) {
-                                      final subPlacesText = e['subPlace']
-                                          ?.toString()
-                                          .replaceAll('[', '')
-                                          .replaceAll(']', '');
+                                      final sub = e['subPlace'] != null
+                                          ? ' (${e['subPlace']})'
+                                          : '';
                                       final workerNames = e['workerIds']
                                           .map<String>(
                                             (id) =>
@@ -223,36 +240,66 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                                           )
                                           .join(', ');
 
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 4,
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '• ${e['place']}${subPlacesText != null && subPlacesText.isNotEmpty ? ' ($subPlacesText)' : ''}',
-                                              style: const TextStyle(
-                                                fontSize: 13,
+                                      // 🎨 Génère une couleur stable selon le nom du lieu
+                                      final place = e['place'] ?? 'Inconnu';
+                                      final colorIndex =
+                                          (place.hashCode %
+                                          Colors.primaries.length);
+                                      final baseColor =
+                                          Colors.primaries[colorIndex].shade200;
+
+                                      return InkWell(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => EditEventPage(
+                                                eventId: e['id'],
                                               ),
                                             ),
-                                            if (workerNames.isNotEmpty)
+                                          );
+                                        },
+                                        child: Container(
+                                          margin: const EdgeInsets.only(
+                                            bottom: 6,
+                                          ),
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            color: baseColor,
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.black12,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
                                               Text(
-                                                '  Travailleurs: $workerNames',
+                                                '• $place$sub',
                                                 style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontStyle: FontStyle.italic,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
                                                 ),
                                               ),
-                                            if ((e['task'] ?? '').isNotEmpty)
+                                              if (workerNames.isNotEmpty)
+                                                Text(
+                                                  'Travailleurs: $workerNames',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
                                               Text(
-                                                '  Tâche: ${e['task']}',
+                                                'Tâche: ${e['task']}',
                                                 style: const TextStyle(
                                                   fontSize: 12,
                                                 ),
                                               ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       );
                                     }).toList(),
