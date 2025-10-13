@@ -3,7 +3,7 @@ import 'package:cleaning_schedule/models/user_model.dart';
 class WorkerModel extends UserModel {
   final String? lieuId;
   final String? monitriceId;
-  final String statut; // ex: "présent", "absent", "en pause"
+  final String statut; 
 
   WorkerModel({
     required super.id,
@@ -12,7 +12,7 @@ class WorkerModel extends UserModel {
     required super.email,
     this.lieuId,
     this.monitriceId,
-    this.statut = 'présent',
+    this.statut = 'Plein temps',
   }) : super(role: 'WorkerModel');
 
   factory WorkerModel.fromMap(Map<String, dynamic> data, String id) {
@@ -23,7 +23,7 @@ class WorkerModel extends UserModel {
       email: data['email'] ?? '',
       lieuId: data['lieuId'],
       monitriceId: data['monitriceId'],
-      statut: data['statut'] ?? 'présent',
+      statut: data['statut'] ?? 'Plein temps',
     );
   }
 

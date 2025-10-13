@@ -58,6 +58,7 @@ class _HomePageState extends State<HomePage> {
       body: _pages[_selectedIndex],
       // FAB centré
       floatingActionButton: FloatingActionButton(
+        heroTag: null, //evite le conflit
         onPressed: () => stubController.onFabPressed(context),
         tooltip: 'Nouveau planning',
         child: const Icon(Icons.edit),
