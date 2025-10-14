@@ -1,3 +1,4 @@
+import 'package:cleaning_schedule/screens/instructors/instructor_profile_page.dart';
 import 'package:cleaning_schedule/screens/places/list_place_page.dart';
 import 'package:cleaning_schedule/screens/planning/created_event_page.dart';
 import 'package:cleaning_schedule/screens/workers/list_workers_page.dart';
@@ -62,6 +63,7 @@ class CleaningScheduleApp extends StatelessWidget {
         '/listPlace': (context) => const ListPlace(),
         '/workers': (context) => const ListWorkersPage(),
         '/createdPlanning': (context) => const CreatedEventPage(),
+        '/profileInstructor' : (context) => const InstructorProfilePage()
 
         // '/detailsPlace': (context) => const DetailsPlacePage(),
 },

@@ -102,8 +102,7 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
 
       String formatEvents(List<Map<String, dynamic>> events) {
         if (events.isEmpty) return '—';
-        return events
-            .map((e) {
+        return events.map((e) {
               final workers = (e['workerIds'] as List)
                   .map((id) => _workersMap[id] ?? 'Inconnu')
                   .join(', ');
@@ -126,8 +125,7 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
     }
 
     // Découper les lignes pour créer plusieurs pages
-    const maxRowsPerPage =
-        5; // tu peux ajuster selon la taille de la page et du texte
+    const maxRowsPerPage = 5; // tu peux ajuster selon la taille de la page et du texte
     for (
       int pageStart = 0;
       pageStart < allRows.length;
@@ -471,69 +469,49 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: cellEvents.isEmpty
-                                    ? const Center(
-                                        child: Text(
-                                          '—',
-                                          style: TextStyle(
-                                            color: Colors.black54,
-                                          ),
-                                        ),
-                                      )
-                                    : ListView(
+                                ? const Center(
+                                    child: Text(
+                                      '—',
+                                      style: TextStyle(color: Colors.black54),
+                                    ),
+                                  )
+                                : Stack(
+                                    children: [
+                                      ListView(
                                         children: cellEvents.map((e) {
-                                          final sub = e['subPlace'] != null
-                                              ? ' (${e['subPlace']})'
-                                              : '';
+                                          final sub = e['subPlace'] != null ? ' (${e['subPlace']})' : '';
                                           final workerNames = e['workerIds']
-                                              .map<String>(
-                                                (id) =>
-                                                    _workersMap[id] ??
-                                                    'Inconnu',
-                                              )
+                                              .map<String>((id) => _workersMap[id] ?? 'Inconnu')
                                               .join(', ');
 
-                                          // 🎨 Génère une couleur stable selon le nom du lieu
                                           final place = e['place'] ?? 'Inconnu';
-                                          final colorIndex =
-                                              (place.hashCode %
-                                              Colors.primaries.length);
-                                          final baseColor = Colors
-                                              .primaries[colorIndex]
-                                              .shade200;
+                                          final colorIndex = (place.hashCode % Colors.primaries.length);
+                                          final baseColor = Colors.primaries[colorIndex].shade200;
 
                                           return InkWell(
                                             onTap: () {
                                               Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
-                                                  builder: (_) => EditEventPage(
-                                                    eventId: e['id'],
-                                                  ),
+                                                  builder: (_) => EditEventPage(eventId: e['id']),
                                                 ),
                                               );
                                             },
                                             child: Container(
-                                              margin: const EdgeInsets.only(
-                                                bottom: 6,
-                                              ),
+                                              margin: const EdgeInsets.only(bottom: 6),
                                               padding: const EdgeInsets.all(6),
                                               decoration: BoxDecoration(
                                                 color: baseColor,
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                                border: Border.all(
-                                                  color: Colors.black12,
-                                                ),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: Colors.black12),
                                               ),
                                               child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
+                                                crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
                                                     '• $place$sub',
                                                     style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
+                                                      fontWeight: FontWeight.bold,
                                                       fontSize: 13,
                                                     ),
                                                   ),
@@ -542,15 +520,12 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                                                       'Travailleurs: $workerNames',
                                                       style: const TextStyle(
                                                         fontSize: 12,
-                                                        fontStyle:
-                                                            FontStyle.italic,
+                                                        fontStyle: FontStyle.italic,
                                                       ),
                                                     ),
                                                   Text(
-                                                    'Tâche: ${e['task']}',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                    ),
+                                                    e['task'] == '' ? '' : 'Tâche: ${e['task']}',
+                                                    style: const TextStyle(fontSize: 12),
                                                   ),
                                                 ],
                                               ),
@@ -558,6 +533,24 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                                           );
                                         }).toList(),
                                       ),
+
+                                      // 🔽 Petite flèche d'indication
+                                      if (cellEvents.length > 3)
+                                        const Positioned(
+                                          bottom: 2,
+                                          left: 0,
+                                          right: 0,
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.keyboard_arrow_down,
+                                              size: 25,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+
                               );
                             }),
                           ],

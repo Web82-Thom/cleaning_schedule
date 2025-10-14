@@ -49,6 +49,13 @@ class _HomePageState extends State<HomePage> {
         title: const Text('Atelier de nettoyage'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.person_sharp),
+            tooltip: 'Profil',
+            onPressed: () => {
+              Navigator.pushNamed(context, '/profileInstructor'),
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Déconnexion',
             onPressed: () => authController.signOut(context),

@@ -13,12 +13,15 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
   final _formKey = GlobalKey<FormState>();
 
   // Firestore
-  final CollectionReference eventsRef =
-      FirebaseFirestore.instance.collection('events');
-  final CollectionReference placesRef =
-      FirebaseFirestore.instance.collection('places');
-  final CollectionReference workersRef =
-      FirebaseFirestore.instance.collection('workers');
+  final CollectionReference eventsRef = FirebaseFirestore.instance.collection(
+    'events',
+  );
+  final CollectionReference placesRef = FirebaseFirestore.instance.collection(
+    'places',
+  );
+  final CollectionReference workersRef = FirebaseFirestore.instance.collection(
+    'workers',
+  );
 
   // Form fields
   DateTime? _selectedDate;
@@ -42,57 +45,67 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
   }
 
   Future<void> _loadPlaces() async {
-  final snapshot = await placesRef.get();
+    final snapshot = await placesRef.get();
 
-  List<Map<String, dynamic>> loadedPlaces = [];
-  Map<String, List<String>> loadedSubPlaces = {};
+    List<Map<String, dynamic>> loadedPlaces = [];
+    Map<String, List<String>> loadedSubPlaces = {};
 
-  for (var doc in snapshot.docs) {
-    final data = doc.data() as Map<String, dynamic>;
-    final placeName = (data['name'] ?? '').toString().trim();
+    for (var doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final placeName = (data['name'] ?? '').toString().trim();
 
-    // 🔹 On charge la sous-collection "rooms" du lieu
-    final roomsSnapshot = await placesRef.doc(doc.id).collection('rooms').get();
-    final subPlaces = roomsSnapshot.docs
-        .map((r) => (r.data()['name'] ?? '').toString().trim())
-        .where((name) => name.isNotEmpty)
-        .toList();
+      // 🔹 On charge la sous-collection "rooms" du lieu
+      final roomsSnapshot = await placesRef
+          .doc(doc.id)
+          .collection('rooms')
+          .get();
+      final subPlaces = roomsSnapshot.docs
+          .map((r) => (r.data()['name'] ?? '').toString().trim())
+          .where((name) => name.isNotEmpty)
+          .toList();
 
-    loadedPlaces.add({'id': doc.id, 'name': placeName});
-    loadedSubPlaces[placeName] = subPlaces;
+      loadedPlaces.add({'id': doc.id, 'name': placeName});
+      loadedSubPlaces[placeName] = subPlaces;
+    }
+
+    setState(() {
+      _places = loadedPlaces;
+      _subPlacesMap = loadedSubPlaces;
+    });
+
+    print('✅ Lieux chargés : $_places');
+    print('✅ Sous-lieux map : $_subPlacesMap');
   }
-
-  setState(() {
-    _places = loadedPlaces;
-    _subPlacesMap = loadedSubPlaces;
-  });
-
-  print('✅ Lieux chargés : $_places');
-  print('✅ Sous-lieux map : $_subPlacesMap');
-}
 
   Future<void> _loadWorkers() async {
     final snapshot = await workersRef.where('active', isEqualTo: true).get();
     setState(() {
       _workers = snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        return {'id': doc.id, 'name': '${data['firstName']} ${data['name']}'};
+        return {
+          'id': doc.id,
+          'name': '${data['firstName']} ${data['name']}',
+          'isAbcent': data['isAbcent'] ?? false,
+        };
       }).toList();
     });
   }
+
   ///Recupere le numero de la semaine
   int _getWeekNumber(DateTime date) {
-  final firstDayOfYear = DateTime(date.year, 1, 1);
-  final daysOffset = firstDayOfYear.weekday - DateTime.monday;
-  final firstMonday = firstDayOfYear.subtract(Duration(days: daysOffset));
-  return ((date.difference(firstMonday).inDays) / 7).ceil() + 1;
-}
+    final firstDayOfYear = DateTime(date.year, 1, 1);
+    final daysOffset = firstDayOfYear.weekday - DateTime.monday;
+    final firstMonday = firstDayOfYear.subtract(Duration(days: daysOffset));
+    return ((date.difference(firstMonday).inDays) / 7).ceil() + 1;
+  }
+
   Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() != true) return;
     if (_selectedDate == null || _selectedPlace == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Veuillez sélectionner une date et un lieu')),
+          content: Text('Veuillez sélectionner une date et un lieu'),
+        ),
       );
       return;
     }
@@ -108,7 +121,7 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
       task: _task,
       workerIds: _selectedWorkers,
       createdAt: Timestamp.now(),
-      weekNumber: _getWeekNumber(_selectedDate!)
+      weekNumber: _getWeekNumber(_selectedDate!),
     );
 
     await eventsRef.add(event.toFirestore());
@@ -124,9 +137,7 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Créer un événement'),
-      ),
+      appBar: AppBar(title: const Text('Créer un événement')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -135,9 +146,11 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
             children: [
               // DatePicker
               ListTile(
-                title: Text(_selectedDate == null
-                    ? 'Sélectionner une date'
-                    : 'Date: ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'),
+                title: Text(
+                  _selectedDate == null
+                      ? 'Sélectionner une date'
+                      : 'Date: ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                ),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: () async {
                   final date = await showDatePicker(
@@ -181,8 +194,12 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
                   border: OutlineInputBorder(),
                 ),
                 items: _places
-                    .map((p) => DropdownMenuItem<String>(
-                        value: p['name'], child: Text(p['name'])))
+                    .map(
+                      (p) => DropdownMenuItem<String>(
+                        value: p['name'],
+                        child: Text(p['name']),
+                      ),
+                    )
                     .toList(),
                 value: _selectedPlace,
                 onChanged: (v) {
@@ -196,84 +213,88 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
               const SizedBox(height: 16),
 
               // 🔹 Sélecteur multiple de sous-lieux
-if (_selectedPlace != null &&
-    (_subPlacesMap[_selectedPlace!] ?? []).isNotEmpty) ...[
-  InputDecorator(
-    decoration: const InputDecoration(
-      labelText: 'Sous-lieux (optionnels)',
-      border: OutlineInputBorder(),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 8,
-          children: (_subPlacesMap[_selectedPlace!] ?? []).map((sub) {
-            final isSelected = _selectedSubPlaces.contains(sub);
-            return FilterChip(
-              label: Text(sub),
-              selected: isSelected,
-              selectedColor: Colors.blue.shade100,
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedSubPlaces.add(sub);
-                  } else {
-                    _selectedSubPlaces.remove(sub);
-                  }
-                });
-              },
-            );
-          }).toList(),
-        ),
-        if (_selectedSubPlaces.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text(
-              'Aucun sous-lieu sélectionné',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Sous-lieux sélectionnés :',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              if (_selectedPlace != null &&
+                  (_subPlacesMap[_selectedPlace!] ?? []).isNotEmpty) ...[
+                InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Sous-lieux (optionnels)',
+                    border: OutlineInputBorder(),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        children: (_subPlacesMap[_selectedPlace!] ?? []).map((
+                          sub,
+                        ) {
+                          final isSelected = _selectedSubPlaces.contains(sub);
+                          return FilterChip(
+                            label: Text(sub),
+                            selected: isSelected,
+                            selectedColor: Colors.blue.shade100,
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _selectedSubPlaces.add(sub);
+                                } else {
+                                  _selectedSubPlaces.remove(sub);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      if (_selectedSubPlaces.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Aucun sous-lieu sélectionné',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Sous-lieux sélectionnés :',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              ..._selectedSubPlaces.map(
+                                (sub) => Text('• $sub'),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                ..._selectedSubPlaces.map((sub) => Text('• $sub')),
+                const SizedBox(height: 16),
               ],
-            ),
-          ),
-      ],
-    ),
-  ),
-  const SizedBox(height: 16),
-],
 
-
-//               // Sous-lieu dropdown si existant
-// if (_selectedPlace != null && _subPlacesMap.containsKey(_selectedPlace))
-//   DropdownButtonFormField<String>(
-//     decoration: const InputDecoration(
-//       labelText: 'Sous-lieu (optionnel)',
-//       border: OutlineInputBorder(),
-//     ),
-//     initialValue: _selectedSubPlace,
-//     items: _subPlacesMap[_selectedPlace]!
-//         .map((sub) => DropdownMenuItem<String>(
-//               value: sub,
-//               child: Text(sub),
-//             ))
-//         .toList(),
-//     onChanged: (v) => setState(() => _selectedSubPlace = v),
-//   ),
-
-
+              //               // Sous-lieu dropdown si existant
+              // if (_selectedPlace != null && _subPlacesMap.containsKey(_selectedPlace))
+              //   DropdownButtonFormField<String>(
+              //     decoration: const InputDecoration(
+              //       labelText: 'Sous-lieu (optionnel)',
+              //       border: OutlineInputBorder(),
+              //     ),
+              //     initialValue: _selectedSubPlace,
+              //     items: _subPlacesMap[_selectedPlace]!
+              //         .map((sub) => DropdownMenuItem<String>(
+              //               value: sub,
+              //               child: Text(sub),
+              //             ))
+              //         .toList(),
+              //     onChanged: (v) => setState(() => _selectedSubPlace = v),
+              //   ),
 
               // Tâche
               TextFormField(
@@ -292,23 +313,82 @@ if (_selectedPlace != null &&
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('Assigné aux travailleurs'),
-                        ..._workers.map(
-                          (w) => CheckboxListTile(
-                            title: Text(w['name']),
-                            value: _selectedWorkers.contains(w['id']),
-                            onChanged: (v) {
-                              setState(() {
-                                if (v == true) {
-                                  _selectedWorkers.add(w['id']);
-                                } else {
-                                  _selectedWorkers.remove(w['id']);
-                                }
-                              });
-                            },
-                          ),
+
+                        // Trier et séparer présents / absents
+                        Builder(
+                          builder: (context) {
+                            final presentWorkers =
+                                _workers
+                                    .where((w) => w['isAbcent'] != true)
+                                    .toList()
+                                  ..sort(
+                                    (a, b) => (a['name'] ?? '').compareTo(
+                                      b['name'] ?? '',
+                                    ),
+                                  );
+
+                            final absentWorkers =
+                                _workers
+                                    .where((w) => w['isAbcent'] == true)
+                                    .toList()
+                                  ..sort(
+                                    (a, b) => (a['name'] ?? '').compareTo(
+                                      b['name'] ?? '',
+                                    ),
+                                  );
+
+                            List<Widget> workerWidgets = [];
+
+                            // Présents
+                            workerWidgets.addAll(
+                              presentWorkers.map<Widget>((w) {
+                                return CheckboxListTile(
+                                  title: Text(w['name']),
+                                  value: _selectedWorkers.contains(w['id']),
+                                  onChanged: (v) {
+                                    setState(() {
+                                      if (v == true) {
+                                        _selectedWorkers.add(w['id']);
+                                      } else {
+                                        _selectedWorkers.remove(w['id']);
+                                      }
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            );
+
+                            // Séparateur
+                            if (absentWorkers.isNotEmpty) {
+                              workerWidgets.add(
+                                const Divider(
+                                  color: Colors.black38,
+                                  thickness: 0.5,
+                                ),
+                              );
+                            }
+                            // Absents
+                            workerWidgets.addAll(
+                              absentWorkers.map<Widget>((w) {
+                                return CheckboxListTile(
+                                  title: Text(
+                                    w['name'],
+                                    style: TextStyle(
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  ),
+                                  value: false,
+                                  onChanged: null, // case désactivée
+                                );
+                              }).toList(),
+                            );
+
+                            return Column(children: workerWidgets);
+                          },
                         ),
                       ],
                     ),
+
               const SizedBox(height: 24),
 
               ElevatedButton(
