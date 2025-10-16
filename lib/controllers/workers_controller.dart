@@ -33,11 +33,7 @@ class WorkersController extends ChangeNotifier{
   }
 
   /// Modifier un travailleur
-  Future<void> updateWorker(
-    BuildContext context,
-    String id,
-    Map<String, dynamic> data,
-  ) async {
+  Future<void> updateWorker(BuildContext context,String id,Map<String, dynamic> data,) async {
     final TextEditingController firstNameController = TextEditingController(
       text: data['firstName'] ?? '',
     );
@@ -48,8 +44,9 @@ class WorkersController extends ChangeNotifier{
     bool isPartTime = data['isPartTime'] ?? false;
     bool isTherapeutic = data['isTherapeutic'] ?? false;
     bool isHalfTime = data['isHalfTime'] ?? false;
-    bool isFullTime = (!isPartTime && !isTherapeutic && !isHalfTime);
+    bool isFullTime = !isPartTime && !isTherapeutic && !isHalfTime;
     bool isAbcent = data['isAbcent'] ?? false;
+    
     // ➜ Si un statut est sélectionné, décoche les autres
     if (isPartTime) {
       isTherapeutic = false;
@@ -205,7 +202,7 @@ class WorkersController extends ChangeNotifier{
                               );
                               return;
                             }
-
+                            bool isFullTime = !isPartTime && !isTherapeutic && !isHalfTime;
                             await workersRef.doc(id).update({
                               'firstName':
                                   firstName[0].toUpperCase() +
@@ -213,10 +210,7 @@ class WorkersController extends ChangeNotifier{
                               'name': name.toUpperCase(),
                               'isPartTime': isPartTime,
                               'isTherapeutic': isTherapeutic,
-                              'isFullTime':
-                                  (!isPartTime &&
-                                  !isTherapeutic &&
-                                  !isHalfTime),
+                              'isFullTime': (!isPartTime && !isTherapeutic && !isHalfTime),
                               'isHalfTime': isHalfTime,
                               'isAbcent': isAbcent,
                               'updatedAt': FieldValue.serverTimestamp(),
@@ -281,43 +275,43 @@ class WorkersController extends ChangeNotifier{
     }
   }
 
-/// ➕ Ajouter un travailleur
+  /// ➕ Ajouter un travailleur
   Future<void> _addWorker(BuildContext context, BuildContext dialogContext) async {
-  final firstName = firstNameController.text.trim();
-  final name = nameController.text.trim();
+    final firstName = firstNameController.text.trim();
+    final name = nameController.text.trim();
 
-  if (name.isEmpty || firstName.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Veuillez remplir tous les champs')),
-    );
-    return;
-  }
-
-  try {
-    await workersRef.add({
-      'firstName': firstName[0].toUpperCase() + firstName.substring(1),
-      'name': name.toUpperCase(),
-      'role': 'Travailleur',
-      'active': true,
-      'isPartTime': _isPartTime,
-      'isTherapeutic': _isTherapeutic,
-      'isHalfTime': _isHalfTime,
-      'isFullTime': (!_isPartTime && !_isTherapeutic && !_isHalfTime),
-      'isAbcent': _isAbcent,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    if (context.mounted) {
-      Navigator.of(dialogContext).pop(); // 🔹 on ferme uniquement le Dialog
+    if (name.isEmpty || firstName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Travailleur ajouté avec succès ✅')),
+        const SnackBar(content: Text('Veuillez remplir tous les champs')),
       );
+      return;
     }
-  } catch (e) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Erreur : ${e.toString()}')));
+
+    try {
+      await workersRef.add({
+        'firstName': firstName[0].toUpperCase() + firstName.substring(1),
+        'name': name.toUpperCase(),
+        'role': 'Travailleur',
+        'active': true,
+        'isPartTime': _isPartTime,
+        'isTherapeutic': _isTherapeutic,
+        'isHalfTime': _isHalfTime,
+        'isFullTime': (!_isPartTime && !_isTherapeutic && !_isHalfTime),
+        'isAbcent': _isAbcent,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (context.mounted) {
+        Navigator.of(dialogContext).pop(); // 🔹 on ferme uniquement le Dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Travailleur ajouté avec succès ✅')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Erreur : ${e.toString()}')));
+    }
   }
-}
 
   /// 🪟 Boîte de dialogue d’ajout
   void showAddWorkerDialog(BuildContext context) {
@@ -472,130 +466,293 @@ class WorkersController extends ChangeNotifier{
     );
   }
 
-void showWorkScheduleDialog(
-  BuildContext context,
-  String workerId,
-  Map<String, dynamic> data,
-) {
-  final days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'];
-  Map<String, String?> workSchedule = {};
+  /// Boîte de dialogue ajout/configuration horaires aménagés
+  void showWorkScheduleDialog(
+    BuildContext context,
+    String workerId,
+    Map<String, dynamic> data,
+  ) {
+    final days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'];
 
-  // Charger les horaires existants s’ils existent
-  if (data['workSchedule'] != null) {
-    workSchedule = Map<String, String?>.from(data['workSchedule']);
-  }
+    Map<String, Map<String, dynamic>> workSchedule = {};
 
-  showDialog(
-    context: context,
-    builder: (BuildContext dialogContext) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          Future<void> pickTime(String day) async {
-            final initial = TimeOfDay.now();
-            final picked = await showTimePicker(
-              context: dialogContext,
-              initialTime: initial,
-            );
-            if (picked != null) {
-              setState(() {
-                workSchedule[day] = picked.format(context);
-              });
-            }
+    // Charger les horaires existants s’ils existent et tolérer différents formats
+    if (data['workSchedule'] != null) {
+      final rawSchedule = data['workSchedule'];
+
+      if (rawSchedule is Map) {
+        rawSchedule.forEach((key, value) {
+          if (value is String) {
+            workSchedule[key] = {
+              'endTime': value,
+              'worksMorning': true,
+              'worksAfternoon': true,
+            };
+          } else if (value is Map) {
+            workSchedule[key] = {
+              'endTime': value['endTime'],
+              'worksMorning': value['worksMorning'] ?? true,
+              'worksAfternoon': value['worksAfternoon'] ?? true,
+            };
           }
+        });
+      }
+    }
 
-          return AlertDialog(
-            title: const Text('Configurer les horaires'),
-            content: SingleChildScrollView(
-              child: Column(
-                children: days.map((day) {
-                  return ListTile(
-                    title: Text(day[0].toUpperCase() + day.substring(1)),
-                    subtitle: Text(
-                      workSchedule[day] ?? 'Non défini',
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.access_time),
-                      onPressed: () => pickTime(day),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Annuler'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  await FirebaseFirestore.instance
-                      .collection('workers')
-                      .doc(workerId)
-                      .update({'workSchedule': workSchedule});
+    // Compléter les jours manquants
+    for (var day in days) {
+      workSchedule.putIfAbsent(day, () => {
+            'endTime': null,
+            'worksMorning': true,
+            'worksAfternoon': true,
+          });
+    }
 
-                  if (context.mounted) {
-                    Navigator.of(dialogContext).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Horaires mis à jour ✅'),
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxHeight = MediaQuery.of(dialogContext).size.height * 0.85;
+              final maxWidth = constraints.maxWidth < 600 ? constraints.maxWidth : 600.0;
+
+              return ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: maxHeight,
+                  maxWidth: maxWidth,
+                ),
+                child: StatefulBuilder(
+                  builder: (context, setState) {
+                    Future<void> pickTime(String day) async {
+                      final initial = TimeOfDay.now();
+                      final picked = await showTimePicker(
+                        context: dialogContext,
+                        initialTime: initial,
+                      );
+                      if (picked != null) {
+                        setState(() {
+                          workSchedule[day]!['endTime'] = picked.format(dialogContext);
+                        });
+                      }
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Configurer les horaires aménagés',
+                                  style: TextStyle(
+                                      fontSize: 18, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => Navigator.of(dialogContext).pop(),
+                                icon: const Icon(Icons.close),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: days.map((day) {
+                                  final info = workSchedule[day]!;
+
+                                  return Card(
+                                    margin: const EdgeInsets.symmetric(vertical: 6),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(10.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            day[0].toUpperCase() + day.substring(1),
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            children: [
+                                              const Expanded(
+                                                flex: 2,
+                                                child: Text("Fin de journée :"),
+                                              ),
+                                              Expanded(
+                                                flex: 3,
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.end,
+                                                  children: [
+                                                    Flexible(
+                                                      child: Text(
+                                                        info['endTime'] ?? 'Non défini',
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: const TextStyle(color: Colors.grey),
+                                                      ),
+                                                    ),
+                                                    IconButton(
+                                                      icon: const Icon(Icons.access_time),
+                                                      onPressed: () => pickTime(day),
+                                                      constraints: const BoxConstraints(),
+                                                      padding: EdgeInsets.zero,
+                                                    ),
+                                                    if (info['endTime'] != null)
+                                                      IconButton(
+                                                        icon: const Icon(Icons.clear),
+                                                        onPressed: () {
+                                                          setState(() {
+                                                            info['endTime'] = null;
+                                                          });
+                                                        },
+                                                        constraints: const BoxConstraints(),
+                                                        padding: EdgeInsets.zero,
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const Divider(),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              const Text("Travaille le matin"),
+                                              Switch(
+                                                value: info['worksMorning'] ?? true,
+                                                onChanged: (val) {
+                                                  setState(() {
+                                                    info['worksMorning'] = val;
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              const Text("Travaille l’après-midi"),
+                                              Switch(
+                                                value: info['worksAfternoon'] ?? true,
+                                                onChanged: (val) {
+                                                  setState(() {
+                                                    info['worksAfternoon'] = val;
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.of(dialogContext).pop(),
+                                child: const Text('Annuler'),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  try {
+                                    await FirebaseFirestore.instance
+                                      .collection('workers')
+                                      .doc(workerId)
+                                      .update({'workSchedule': workSchedule});
+
+                                    if (context.mounted) {
+                                      Navigator.of(dialogContext).pop();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content:Text(
+                                            'Horaires aménagés enregistrés ✅',
+                                          )
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                          'Erreur lors de l’enregistrement : ${e.toString()}',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                child: const Text('Enregistrer'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     );
-                  }
-                },
-                child: const Text('Enregistrer'),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
+                  },
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
 
-/// Supprime les horaires personnalisés d'un travailleur avec confirmation
-Future<void> removeWorkSchedule(BuildContext context, String workerId) async {
-  // Affiche une boîte de dialogue de confirmation
-  final confirm = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) {
-      return AlertDialog(
-        title: const Text('Confirmation'),
-        content: const Text('Voulez-vous vraiment supprimer les horaires personnalisés ?'),
+  /// Supprime un jour spécifique du workSchedule avec confirmation
+  void removeWorkSchedule(
+      BuildContext context, String workerId, String day) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Supprimer ce jour"),
+        content: Text("Voulez-vous vraiment supprimer l’horaire du $day ?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Non'),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Annuler"),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Oui'),
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text("Supprimer"),
           ),
         ],
-      );
-    },
-  );
+      ),
+    );
 
-  if (confirm != true) return; // Annule si l’utilisateur clique sur "Non"
+    if (confirm != true) return;
 
-  try {
-    await workersRef.doc(workerId).update({
-      'workSchedule': FieldValue.delete(),
-    });
+    final docRef = FirebaseFirestore.instance.collection('workers').doc(workerId);
+    final snap = await docRef.get();
+    if (!snap.exists) return;
+
+    final data = snap.data() as Map<String, dynamic>;
+    final schedule = Map<String, dynamic>.from(data['workSchedule'] ?? {});
+    schedule.remove(day);
+
+    await docRef.update({'workSchedule': schedule});
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Horaires personnalisés supprimés ✅')),
-      );
-    }
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la suppression : ${e.toString()}')),
+        SnackBar(content: Text('Horaire du $day supprimé ✅')),
       );
     }
   }
-}
-
-
 }

@@ -46,13 +46,12 @@ class _ListPdfPageState extends State<ListPdfPage> {
               itemBuilder: (context, index) {
                 final file = _pdfFiles[index];
                 final fileName = file.path.split('/').last;
-                final lastModif =
-                    file.statSync().modified.toLocal().toString().split('.')[0];
+                final lastModif = file.statSync().modified.toLocal().toString().split('.')[0];
 
                 return ListTile(
                   leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                  title: Text(fileName),
-                  subtitle: Text('Modifié le : $lastModif'),
+                  title: Text(fileName, style: TextStyle(fontSize: 14),),
+                  subtitle: Text('Modifié le : $lastModif', style: TextStyle(fontSize: 12),),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline),
                     onPressed: () async {

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
 import 'package:cleaning_schedule/screens/instructors/instructor_profile_page.dart';
 import 'package:cleaning_schedule/screens/places/list_place_page.dart';
 import 'package:cleaning_schedule/screens/planning/created_event_page.dart';
@@ -12,12 +14,35 @@ import 'firebase_options.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/home_page.dart';
 
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR', null);
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+
+  try {
+    if (kIsWeb) {
+      // ✅ WEB
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      print('✅ Firebase initialized on Web');
+    } else if (Platform.isWindows) {
+      // ✅ WINDOWS
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      print('✅ Firebase Core initialized on Windows (Auth disabled)');
+    } else {
+      // ✅ MOBILE (Android / iOS / macOS / Linux)
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      print('✅ Firebase initialized on ${Platform.operatingSystem}');
+    }
+  } catch (e) {
+    print('❌ Firebase initialization failed: $e');
+  }
+
   runApp(const CleaningScheduleApp());
 }
 

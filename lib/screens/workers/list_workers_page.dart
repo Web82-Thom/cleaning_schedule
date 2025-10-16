@@ -73,6 +73,13 @@ class _ListWorkersPageState extends State<ListWorkersPage> {
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
+                        // Icône horloge si le worker a un workSchedule
+                        if (data['workSchedule'] != null)
+                        const Icon(
+                          Icons.schedule,
+                          color: Colors.pinkAccent,
+                          size: 20,
+                        ),
                       ],
                     ),
                     subtitle: RichText(
@@ -87,15 +94,15 @@ class _ListWorkersPageState extends State<ListWorkersPage> {
                               ),
                             ),
                           // Ajoute " / Absent" uniquement si le worker n'est pas en plein temps ou si absent
-                          if (isAbsentData)
-                            const TextSpan(
-                              text: 'ABSENT',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
+                          if (isAbsentData) 
+                          const TextSpan(
+                            text: 'ABSENT',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
+                          ),
                         ],
                       ),
                     ),

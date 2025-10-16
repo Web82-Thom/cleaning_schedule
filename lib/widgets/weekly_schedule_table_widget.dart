@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:open_filex/open_filex.dart';
 
 class WeeklyScheduleTableWidget extends StatefulWidget {
   final DateTime initialWeek;
@@ -80,12 +81,12 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
   Future<void> _generateWeeklyPdf(List<Map<String, dynamic>> events) async {
     final pdf = pw.Document();
 
+    // Jours de la semaine
     final days = _weekDays;
-    final dayLabels = days
-        .map((d) => DateFormat('EEEE', 'fr_FR').format(d))
-        .toList();
+    final dayLabels =
+        days.map((d) => DateFormat('EEEE', 'fr_FR').format(d)).toList();
 
-    // Grouper les events par jour et créneau
+    // Grouper les événements par jour + créneau
     Map<String, List<Map<String, dynamic>>> grouped = {};
     for (var e in events) {
       final key =
@@ -93,100 +94,145 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
       grouped.putIfAbsent(key, () => []).add(e);
     }
 
-    // Créer un tableau de "lignes" par jour
-    List<List<String>> allRows = [];
-    for (int i = 0; i < days.length; i++) {
-      final dayKey = DateFormat('yyyy-MM-dd').format(days[i]);
-      final morningEvents = grouped['${dayKey}_morning'] ?? [];
-      final afternoonEvents = grouped['${dayKey}_afternoon'] ?? [];
-
-      String formatEvents(List<Map<String, dynamic>> events) {
-        if (events.isEmpty) return '—';
-        return events.map((e) {
-              final workers = (e['workerIds'] as List)
-                  .map((id) => _workersMap[id] ?? 'Inconnu')
-                  .join(', ');
-              final subPlace = (e['subPlace'] != null && e['subPlace'] != '')
-                  ? ' (${e['subPlace']})'
-                  : '';
-              final task = (e['task'] != null && e['task'] != '')
-                  ? '\nTâche: ${e['task']}'
-                  : '';
-              return '${e['place']}$subPlace$task\nTravailleurs: $workers';
-            })
-            .join('\n\n');
+    // Fonction de formatage avec couleurs
+    pw.Widget buildEventList(List<Map<String, dynamic>> list) {
+      if (list.isEmpty) {
+        return pw.Text('—', style: const pw.TextStyle(color: PdfColors.grey));
       }
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: list.map((e) {
+          final workers = (e['workerIds'] as List)
+              .map((id) => _workersMap[id] ?? 'Inconnu')
+              .join(', ');
+          final subPlace = (e['subPlace'] != null && e['subPlace'] != '')
+              ? ' (${e['subPlace']})'
+              : '';
+          final task = (e['task'] != null && e['task'] != '')
+              ? '\nTâche : ${e['task']}'
+              : '';
 
-      allRows.add([
-        dayLabels[i].toUpperCase(),
-        formatEvents(morningEvents),
-        formatEvents(afternoonEvents),
-      ]);
-    }
-
-    // Découper les lignes pour créer plusieurs pages
-    const maxRowsPerPage = 5; // tu peux ajuster selon la taille de la page et du texte
-    for (
-      int pageStart = 0;
-      pageStart < allRows.length;
-      pageStart += maxRowsPerPage
-    ) {
-      final pageRows = allRows.sublist(
-        pageStart,
-        (pageStart + maxRowsPerPage).clamp(0, allRows.length),
-      );
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4.landscape,
-          build: (context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                if (pageStart == 0) ...[
-                  pw.Text(
-                    'Planning semaine $_weekNumber',
+          return pw.Container(
+            margin: const pw.EdgeInsets.only(bottom: 6),
+            child: pw.RichText(
+              text: pw.TextSpan(
+                children: [
+                  pw.TextSpan(
+                    text: e['place'] ?? 'Lieu inconnu',
                     style: pw.TextStyle(
-                      fontSize: 20,
                       fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.blue800,
+                      fontSize: 11,
                     ),
                   ),
-                  pw.SizedBox(height: 10),
-                  pw.Text(
-                    'Du ${DateFormat('dd/MM').format(_startOfWeek)} au ${DateFormat('dd/MM').format(_endOfWeek)}',
+                  if (subPlace.isNotEmpty)
+                    pw.TextSpan(
+                      text: subPlace,
+                      style: const pw.TextStyle(color: PdfColors.indigo),
+                    ),
+                  if (task.isNotEmpty)
+                    pw.TextSpan(
+                      text: task,
+                      style: const pw.TextStyle(color: PdfColors.deepPurple),
+                    ),
+                  pw.TextSpan(
+                    text: '\nTravailleurs : $workers',
+                    style: const pw.TextStyle(color: PdfColors.grey700),
                   ),
-                  pw.SizedBox(height: 20),
                 ],
-                pw.Table.fromTextArray(
-                  headers: ['Jour', 'Matin', 'Après-midi'],
-                  data: pageRows,
-                  cellStyle: pw.TextStyle(fontSize: 10),
-                  headerStyle: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                  cellAlignment: pw.Alignment.topLeft,
-                  headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-                  columnWidths: {
-                    0: const pw.FixedColumnWidth(80),
-                    1: const pw.FixedColumnWidth(200),
-                    2: const pw.FixedColumnWidth(200),
-                  },
-                ),
-              ],
-            );
-          },
-        ),
+              ),
+            ),
+          );
+        }).toList(),
       );
     }
 
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/planning_semaine_$_weekNumber.pdf');
+    // Fonction pour une page (matin ou après-midi)
+    pw.MultiPage buildPage(String title, String slot) {
+      return pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(20),
+        build: (context) {
+          return [
+            pw.Text(
+              'Planning semaine $_weekNumber - $title',
+              style: pw.TextStyle(
+                fontSize: 20,
+                fontWeight: pw.FontWeight.bold,
+                color: slot == 'morning' ? PdfColors.orange800 : PdfColors.teal800,
+              ),
+            ),
+            pw.SizedBox(height: 10),
+            pw.Text(
+              'Du ${DateFormat('dd/MM').format(_startOfWeek)} au ${DateFormat('dd/MM').format(_endOfWeek)}',
+              style: const pw.TextStyle(color: PdfColors.grey700),
+            ),
+            pw.SizedBox(height: 20),
+
+            // Tableau
+            pw.Table(
+              border: pw.TableBorder.all(width: 0.5, color: PdfColors.grey600),
+              columnWidths: {
+                for (int i = 0; i < days.length; i++)
+                  i: const pw.FlexColumnWidth(),
+              },
+              children: [
+                // Ligne des jours
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                  children: dayLabels
+                      .map(
+                        (label) => pw.Padding(
+                          padding: const pw.EdgeInsets.all(5),
+                          child: pw.Center(
+                            child: pw.Text(
+                              label.toUpperCase(),
+                              style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColors.green,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                // Ligne du contenu
+                pw.TableRow(
+                  children: days.map((day) {
+                    final key =
+                        '${DateFormat('yyyy-MM-dd').format(day)}_$slot';
+                    final eventsForDay = grouped[key] ?? [];
+                    return pw.Padding(
+                      padding: const pw.EdgeInsets.all(5),
+                      child: buildEventList(eventsForDay),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ];
+        },
+      );
+    }
+
+    // Génération des deux pages
+    pdf.addPage(buildPage('MATIN', 'morning'));
+    pdf.addPage(buildPage('APRÈS-MIDI', 'afternoon'));
+
+    // Sauvegarde du fichier
+    final dir = await getApplicationDocumentsDirectory();
+    final fileName =
+        'planning_week_$_weekNumber.pdf';
+    final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(await pdf.save());
 
-    if (context.mounted) {
+    await OpenFilex.open(file.path);
+
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('PDF enregistré : ${file.path} ✅')),
+        SnackBar(content: Text('PDF généré : $fileName ✅')),
       );
     }
   }
@@ -479,7 +525,9 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                                     children: [
                                       ListView(
                                         children: cellEvents.map((e) {
-                                          final sub = e['subPlace'] != null ? ' (${e['subPlace']})' : '';
+                                          final sub = (e['subPlace'] != null && e['subPlace'] is List && (e['subPlace'] as List).isNotEmpty)
+                                            ? ' ${(e['subPlace'] as List).join(", ")}'
+                                            : '';
                                           final workerNames = e['workerIds']
                                               .map<String>((id) => _workersMap[id] ?? 'Inconnu')
                                               .join(', ');
@@ -509,15 +557,35 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
-                                                    '• $place$sub',
+                                                    '• $place',
                                                     style: const TextStyle(
                                                       fontWeight: FontWeight.bold,
-                                                      fontSize: 13,
+                                                      fontSize: 12,
                                                     ),
                                                   ),
+                                                  
+                                                  if (sub.isNotEmpty) 
+   Text(
+    ' - $sub',
+    style: const TextStyle(
+      fontSize: 12,
+      color: Colors.black87
+    ),
+  )
+ else 
+   const SizedBox.shrink(), // ne rien afficher si sub est vide
+
                                                   if (workerNames.isNotEmpty)
+                                                  Text(
+                                                      'Travailleurs:',
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontStyle: FontStyle.italic,
+                                                      ),
+                                                    ),
                                                     Text(
-                                                      'Travailleurs: $workerNames',
+                                                      '$workerNames',
                                                       style: const TextStyle(
                                                         fontSize: 12,
                                                         fontStyle: FontStyle.italic,
