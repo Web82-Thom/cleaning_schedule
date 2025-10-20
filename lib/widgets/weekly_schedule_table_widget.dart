@@ -1,13 +1,11 @@
-import 'dart:io';
+import 'package:cleaning_schedule/controllers/pdf_controller.dart';
+import 'package:cleaning_schedule/controllers/schedule_controller.dart';
+import 'package:cleaning_schedule/controllers/workers_controller.dart';
 import 'package:cleaning_schedule/screens/list_pdf_page.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:cleaning_schedule/screens/planning/edit_event_page.dart';
+import 'package:cleaning_schedule/screens/planning/event_from_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:open_filex/open_filex.dart';
 
 class WeeklyScheduleTableWidget extends StatefulWidget {
   final DateTime initialWeek;
@@ -22,40 +20,29 @@ class WeeklyScheduleTableWidget extends StatefulWidget {
 class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
   late DateTime _startOfWeek;
   late DateTime _endOfWeek;
-
+  final ScheduleController _scheduleController = ScheduleController();
+  final WorkersController workersController = WorkersController();
   Map<String, String> _workersMap = {}; // workerId → workerName
+  
+  int get _weekNumber => _getWeekNumber(_startOfWeek);
 
   @override
   void initState() {
     super.initState();
     _startOfWeek = _getStartOfWeek(widget.initialWeek);
     _endOfWeek = _startOfWeek.add(const Duration(days: 4));
-    _loadWorkers();
-  }
-
-  Future<void> _loadWorkers() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('workers')
-        .where('active', isEqualTo: true)
-        .get();
-
-    if (!mounted) return;
-
-    setState(() {
-      _workersMap = {
-        for (var doc in snapshot.docs)
-          doc.id: '${doc['firstName']} ${doc['name']}',
-      };
+    workersController.loadWorkers().then((map) {
+      if(!mounted) return;
+      setState(() {
+        _workersMap = map;
+      });
     });
   }
 
-  DateTime _getStartOfWeek(DateTime date) =>
-      date.subtract(Duration(days: date.weekday - 1));
+  // ---------- Semaine ----------
+  DateTime _getStartOfWeek(DateTime date) => date.subtract(Duration(days: date.weekday - 1));
 
-  List<DateTime> get _weekDays =>
-      List.generate(5, (i) => _startOfWeek.add(Duration(days: i)));
-
-  int get _weekNumber => _getWeekNumber(_startOfWeek);
+  List<DateTime> get _weekDays => List.generate(5, (i) => _startOfWeek.add(Duration(days: i)));
 
   int _getWeekNumber(DateTime date) {
     final firstDayOfYear = DateTime(date.year, 1, 1);
@@ -78,204 +65,140 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
     });
   }
 
-  Future<void> _generateWeeklyPdf(List<Map<String, dynamic>> events) async {
-    final pdf = pw.Document();
+  // ---------- Gestion  de subPlace ----------
+  String formatSubPlace(dynamic subPlace) {
+    if (subPlace == null) return '';
 
-    // Jours de la semaine
-    final days = _weekDays;
-    final dayLabels =
-        days.map((d) => DateFormat('EEEE', 'fr_FR').format(d)).toList();
-
-    // Grouper les événements par jour + créneau
-    Map<String, List<Map<String, dynamic>>> grouped = {};
-    for (var e in events) {
-      final key =
-          '${DateFormat('yyyy-MM-dd').format(e['day'])}_${e['timeSlot']}';
-      grouped.putIfAbsent(key, () => []).add(e);
+    if (subPlace is List) {
+      final filtered = subPlace
+          .where((e) => e != null && e.toString().trim().isNotEmpty)
+          .toList();
+      if (filtered.isEmpty) return '';
+      return filtered.join(', ');
     }
 
-    // Fonction de formatage avec couleurs
-    pw.Widget buildEventList(List<Map<String, dynamic>> list) {
-      if (list.isEmpty) {
-        return pw.Text('—', style: const pw.TextStyle(color: PdfColors.grey));
-      }
-      return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: list.map((e) {
-          final workers = (e['workerIds'] as List)
-              .map((id) => _workersMap[id] ?? 'Inconnu')
-              .join(', ');
-          final subPlace = (e['subPlace'] != null && e['subPlace'] != '')
-              ? ' (${e['subPlace']})'
-              : '';
-          final task = (e['task'] != null && e['task'] != '')
-              ? '\nTâche : ${e['task']}'
-              : '';
+    if (subPlace is String && subPlace.trim().isNotEmpty) return subPlace;
 
-          return pw.Container(
-            margin: const pw.EdgeInsets.only(bottom: 6),
-            child: pw.RichText(
-              text: pw.TextSpan(
-                children: [
-                  pw.TextSpan(
-                    text: e['place'] ?? 'Lieu inconnu',
-                    style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.blue800,
-                      fontSize: 11,
-                    ),
-                  ),
-                  if (subPlace.isNotEmpty)
-                    pw.TextSpan(
-                      text: subPlace,
-                      style: const pw.TextStyle(color: PdfColors.indigo),
-                    ),
-                  if (task.isNotEmpty)
-                    pw.TextSpan(
-                      text: task,
-                      style: const pw.TextStyle(color: PdfColors.deepPurple),
-                    ),
-                  pw.TextSpan(
-                    text: '\nTravailleurs : $workers',
-                    style: const pw.TextStyle(color: PdfColors.grey700),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      );
-    }
-
-    // Fonction pour une page (matin ou après-midi)
-    pw.MultiPage buildPage(String title, String slot) {
-      return pw.MultiPage(
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(20),
-        build: (context) {
-          return [
-            pw.Text(
-              'Planning semaine $_weekNumber - $title',
-              style: pw.TextStyle(
-                fontSize: 20,
-                fontWeight: pw.FontWeight.bold,
-                color: slot == 'morning' ? PdfColors.orange800 : PdfColors.teal800,
-              ),
-            ),
-            pw.SizedBox(height: 10),
-            pw.Text(
-              'Du ${DateFormat('dd/MM').format(_startOfWeek)} au ${DateFormat('dd/MM').format(_endOfWeek)}',
-              style: const pw.TextStyle(color: PdfColors.grey700),
-            ),
-            pw.SizedBox(height: 20),
-
-            // Tableau
-            pw.Table(
-              border: pw.TableBorder.all(width: 0.5, color: PdfColors.grey600),
-              columnWidths: {
-                for (int i = 0; i < days.length; i++)
-                  i: const pw.FlexColumnWidth(),
-              },
-              children: [
-                // Ligne des jours
-                pw.TableRow(
-                  decoration: const pw.BoxDecoration(color: PdfColors.grey300),
-                  children: dayLabels
-                      .map(
-                        (label) => pw.Padding(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Center(
-                            child: pw.Text(
-                              label.toUpperCase(),
-                              style: pw.TextStyle(
-                                fontWeight: pw.FontWeight.bold,
-                                color: PdfColors.green,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-                // Ligne du contenu
-                pw.TableRow(
-                  children: days.map((day) {
-                    final key =
-                        '${DateFormat('yyyy-MM-dd').format(day)}_$slot';
-                    final eventsForDay = grouped[key] ?? [];
-                    return pw.Padding(
-                      padding: const pw.EdgeInsets.all(5),
-                      child: buildEventList(eventsForDay),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ];
-        },
-      );
-    }
-
-    // Génération des deux pages
-    pdf.addPage(buildPage('MATIN', 'morning'));
-    pdf.addPage(buildPage('APRÈS-MIDI', 'afternoon'));
-
-    // Sauvegarde du fichier
-    final dir = await getApplicationDocumentsDirectory();
-    final fileName =
-        'planning_week_$_weekNumber.pdf';
-    final file = File('${dir.path}/$fileName');
-    await file.writeAsBytes(await pdf.save());
-
-    await OpenFilex.open(file.path);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('PDF généré : $fileName ✅')),
-      );
-    }
+    return '';
   }
 
+  // ---------- récuperer le nom des travailleurs ----------
+  String getWorkerNames(List<String> ids) {
+    return ids.map((id) => _workersMap[id] ?? 'Inconnu').join(', ');
+  }
+
+  //------------ construction scroll et chevron dans les cellules
+  Widget buildScrollableCell(List<Map<String, dynamic>> events) {
+  final scrollController = ScrollController();
+  bool showChevron = false;
+
+  return StatefulBuilder(
+    builder: (context, setInnerState) {
+      scrollController.addListener(() {
+        final maxScroll = scrollController.position.maxScrollExtent;
+        final current = scrollController.offset;
+        final shouldShow = current < maxScroll;
+        if (shouldShow != showChevron) {
+          setInnerState(() => showChevron = shouldShow);
+        }
+      });
+
+      return Stack(
+        children: [
+          Scrollbar(
+            controller: scrollController,
+            thumbVisibility: true,
+            thickness: 4,
+            radius: const Radius.circular(4),
+            trackVisibility: true,
+            child: ListView(
+              controller: scrollController,
+              children: events.map((e) => buildEventCell(e)).toList(),
+            ),
+          ),
+          if (showChevron)
+            const Positioned(
+              bottom: 2,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Icon(
+                  Icons.arrow_circle_down_sharp,
+                  color: Colors.red,
+                  size: 20,
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
+
+  //------------ construction des cellules ----------------
+  Widget buildEventCell(Map<String, dynamic> e) {
+  final sub = formatSubPlace(e['subPlace']);
+  final workerNames = getWorkerNames(e['workerIds']);
+  final place = e['place'] ?? 'Inconnu';
+  final baseColor = e['isWeeklyTask'] == true
+      ? Colors.purple.shade100
+      : Colors.primaries[place.hashCode % Colors.primaries.length].shade200;
+
+  return InkWell(
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => EventFormPage(eventId: e['id'])),
+    ),
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: baseColor,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('• $place', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+              if (e['isWeeklyTask'] == false)
+                Container(width: 10, height: 10, margin: const EdgeInsets.only(left: 4), decoration: const BoxDecoration(color: Colors.purple, shape: BoxShape.circle)),
+            ],
+          ),
+          if (sub.isNotEmpty) Text(' - $sub', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+          if (workerNames.isNotEmpty) const Text('Travailleurs:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),
+          if (workerNames.isNotEmpty) Text(workerNames, style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+          if (e['task'] != null && e['task'] != '') Text('Tâche: ${e['task']}', style: const TextStyle(fontSize: 12)),
+        ],
+      ),
+    ),
+  );
+}
+
+  // ---------- Build Widget ----------
   @override
   Widget build(BuildContext context) {
-    final days = _weekDays;
-    final title =
-        'Semaine $_weekNumber — du ${DateFormat('dd/MM').format(_startOfWeek)} au ${DateFormat('dd/MM').format(_endOfWeek)}';
+    final title = 'Semaine $_weekNumber — du ${DateFormat('dd/MM').format(_startOfWeek)} au ${DateFormat('dd/MM').format(_endOfWeek)}';
 
     return StreamBuilder(
-      stream: FirebaseFirestore.instance
-          .collection('events')
-          .where(
-            'day',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(
-              DateTime(
-                _startOfWeek.year,
-                _startOfWeek.month,
-                _startOfWeek.day,
-                0,
-                0,
-                0,
-              ),
+      stream: FirebaseFirestore.instance.collection('events')
+        .where('day',isGreaterThanOrEqualTo: Timestamp.fromDate(
+          DateTime(_startOfWeek.year, _startOfWeek.month, _startOfWeek.day),),
+        )
+        .where('day', isLessThanOrEqualTo: Timestamp.fromDate(DateTime(
+              _endOfWeek.year,
+              _endOfWeek.month,
+              _endOfWeek.day,
+              23,
+              59,
+              59,
             ),
-          )
-          .where(
-            'day',
-            isLessThanOrEqualTo: Timestamp.fromDate(
-              DateTime(
-                _endOfWeek.year,
-                _endOfWeek.month,
-                _endOfWeek.day,
-                23,
-                59,
-                59,
-              ),
-            ),
-          )
-          .snapshots(),
+          ),
+        ).snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
-          return const Center(child: CircularProgressIndicator());
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
         final events = snapshot.data!.docs.map((doc) {
           final data = doc.data();
@@ -289,11 +212,11 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
             'workerIds': List<String>.from(data['workerIds'] ?? []),
           };
         }).toList();
+
         return Scaffold(
           appBar: AppBar(
             title: Row(
               children: [
-                // 🟢 Bouton PDF
                 IconButton(
                   icon: const Icon(
                     Icons.picture_as_pdf,
@@ -301,17 +224,11 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                   ),
                   tooltip: 'Voir les PDF enregistrés',
                   onLongPress: () async {
-                    // Affiche le dialogue de confirmation
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: const Text(
-                          'Exporter en PDF',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        content: Text(
-                          'Voulez-vous générer le PDF du planning de la semaine $_weekNumber ?',
-                        ),
+                        title: const Text('Exporter en PDF'),
+                        content: Text('Voulez-vous générer le PDF du planning de la semaine $_weekNumber ?'),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
@@ -324,9 +241,19 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                         ],
                       ),
                     );
-
                     if (confirmed == true) {
-                      _generateWeeklyPdf(events);
+                      await PdfController.generateWeeklyPdf(
+                        events: events,
+                        workersMap: _workersMap,
+                        weekNumber: _weekNumber,
+                      );
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(
+                            'PDF généré pour la semaine $_weekNumber ✅')),
+                        );
+                      }
                     }
                   },
                   onPressed: () {
@@ -337,8 +264,6 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                   },
                 ),
                 const SizedBox(width: 8),
-
-                // 🟢 Texte de la semaine + swipe
                 Flexible(
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -346,17 +271,16 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                       horizontal: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.2),
+                      color: const Color.fromARGB(34, 255, 82, 82),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       children: [
-                        // const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             title,
-                            style: const TextStyle(fontSize: 14),
+                            style: const TextStyle(fontSize: 12),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -369,71 +293,24 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.chevron_left),
-                tooltip: 'Semaine précédente',
                 onPressed: _previousWeek,
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
-                tooltip: 'Semaine suivante',
                 onPressed: _nextWeek,
               ),
             ],
           ),
-
-          body: StreamBuilder<QuerySnapshot>(
-            // 🔹 Nouvelle requête : filtre par date, plus par numéro de semaine
-            stream: FirebaseFirestore.instance
-                .collection('events')
-                .where(
-                  'day',
-                  isGreaterThanOrEqualTo: Timestamp.fromDate(
-                    DateTime(
-                      _startOfWeek.year,
-                      _startOfWeek.month,
-                      _startOfWeek.day,
-                      0,
-                      0,
-                      0,
-                    ),
-                  ),
-                )
-                .where(
-                  'day',
-                  isLessThanOrEqualTo: Timestamp.fromDate(
-                    DateTime(
-                      _endOfWeek.year,
-                      _endOfWeek.month,
-                      _endOfWeek.day,
-                      23,
-                      59,
-                      59,
-                    ),
-                  ),
-                )
-                .snapshots(),
+          body: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _scheduleController.loadAllEvents(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
 
-              final events = snapshot.data!.docs.map((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                return {
-                  'id': doc.id,
-                  'day': (data['day'] as Timestamp).toDate(),
-                  'timeSlot': data['timeSlot'],
-                  'place': data['place'],
-                  'subPlace': data['subPlace'],
-                  'task': data['task'],
-                  'workerIds': List<String>.from(data['workerIds'] ?? []),
-                };
-              }).toList();
-
-              // 🔹 Grouper les events par jour + créneau
+              final allEvents = snapshot.data!;
               Map<String, List<Map<String, dynamic>>> grouped = {};
-              for (var e in events) {
-                final key =
-                    '${DateFormat('yyyy-MM-dd').format(e['day'])}_${e['timeSlot']}';
+              for (var e in allEvents) {
+                final key = '${DateFormat('yyyy-MM-dd').format(e['day'])}_${e['timeSlot']}';
                 grouped.putIfAbsent(key, () => []).add(e);
               }
 
@@ -448,11 +325,10 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 🔹 En-tête des jours
                       Row(
                         children: [
                           const SizedBox(width: 40),
-                          ...days.map(
+                          ..._weekDays.map(
                             (d) => Container(
                               width: 180,
                               alignment: Alignment.center,
@@ -470,159 +346,72 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                           ),
                         ],
                       ),
-
-                      // 🔹 Matin / Après-midi
-                      for (var period in ['morning', 'afternoon'])
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 330,
-                              color: Colors.grey.shade300,
-                              child: Center(
-                                child: Transform.rotate(
-                                  angle: -3.14 / 2,
-                                  child: Text(
-                                    period == 'morning'
-                                        ? 'MATIN'
-                                        : 'APRÈS-MIDI',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                      for (var slot in ['morning', 'afternoon'])
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 70,
+                                height: 600,
+                                color: Colors.grey.shade300,
+                                child: Center(
+                                  child: Transform.rotate(
+                                    angle: -3.14 / 2,
+                                    child: FittedBox(
+                                      fit: BoxFit.contain,
+                                      child: Text(
+                                        slot == 'morning'
+                                            ? 'MATIN'
+                                            : 'APRÈS-MIDI',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
                                     ),
-                                    textAlign: TextAlign.center,
-                                    softWrap: false,
-                                    overflow: TextOverflow.visible,
                                   ),
                                 ),
                               ),
-                            ),
-                            ...days.map((day) {
-                              final key =
-                                  '${DateFormat('yyyy-MM-dd').format(day)}_$period';
-                              final cellEvents = grouped[key] ?? [];
+                              ..._weekDays.map((day) {
+                                final key = '${DateFormat('yyyy-MM-dd').format(day)}_$slot';
+                                final cellEvents = grouped[key] ?? [];
 
-                              return Container(
-                                width: 180,
-                                height: 330,
-                                margin: const EdgeInsets.all(2),
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: period == 'morning'
-                                      ? Colors.blue.shade100
-                                      : Colors.orange.shade100,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: cellEvents.isEmpty
-                                ? const Center(
+                                return Container(
+                                  width: 180,
+                                  height: 600,
+                                  margin: const EdgeInsets.all(2),
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: slot == 'morning'
+                                    ? Colors.blue.shade100
+                                    : Colors.orange.shade100,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: cellEvents.isEmpty ?
+                                  const Center(
                                     child: Text(
                                       '—',
-                                      style: TextStyle(color: Colors.black54),
-                                    ),
-                                  )
-                                : Stack(
-                                    children: [
-                                      ListView(
-                                        children: cellEvents.map((e) {
-                                          final sub = (e['subPlace'] != null && e['subPlace'] is List && (e['subPlace'] as List).isNotEmpty)
-                                            ? ' ${(e['subPlace'] as List).join(", ")}'
-                                            : '';
-                                          final workerNames = e['workerIds']
-                                              .map<String>((id) => _workersMap[id] ?? 'Inconnu')
-                                              .join(', ');
-
-                                          final place = e['place'] ?? 'Inconnu';
-                                          final colorIndex = (place.hashCode % Colors.primaries.length);
-                                          final baseColor = Colors.primaries[colorIndex].shade200;
-
-                                          return InkWell(
-                                            onTap: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) => EditEventPage(eventId: e['id']),
-                                                ),
-                                              );
-                                            },
-                                            child: Container(
-                                              margin: const EdgeInsets.only(bottom: 6),
-                                              padding: const EdgeInsets.all(6),
-                                              decoration: BoxDecoration(
-                                                color: baseColor,
-                                                borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: Colors.black12),
-                                              ),
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    '• $place',
-                                                    style: const TextStyle(
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                  
-                                                  if (sub.isNotEmpty) 
-   Text(
-    ' - $sub',
-    style: const TextStyle(
-      fontSize: 12,
-      color: Colors.black87
-    ),
-  )
- else 
-   const SizedBox.shrink(), // ne rien afficher si sub est vide
-
-                                                  if (workerNames.isNotEmpty)
-                                                  Text(
-                                                      'Travailleurs:',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.bold,
-                                                        fontStyle: FontStyle.italic,
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      '$workerNames',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        fontStyle: FontStyle.italic,
-                                                      ),
-                                                    ),
-                                                  Text(
-                                                    e['task'] == '' ? '' : 'Tâche: ${e['task']}',
-                                                    style: const TextStyle(fontSize: 12),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        }).toList(),
+                                      style: TextStyle(
+                                        color: Colors.black54,
                                       ),
-
-                                      // 🔽 Petite flèche d'indication
-                                      if (cellEvents.length > 3)
-                                        const Positioned(
-                                          bottom: 2,
-                                          left: 0,
-                                          right: 0,
-                                          child: Center(
-                                            child: Icon(
-                                              Icons.keyboard_arrow_down,
-                                              size: 25,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-
-                              );
-                            }),
-                          ],
-                        ),
+                                    ),
+                                  ) :
+                                  buildScrollableCell(cellEvents),
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                          if (slot == 'morning')
+                          SizedBox(
+                            width: MediaQuery.of(context).size.width * 2.75,
+                            height: 4,
+                            child: Container(color: Colors.black),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),

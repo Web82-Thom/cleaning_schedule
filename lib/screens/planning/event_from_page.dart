@@ -1,16 +1,18 @@
-import 'package:cleaning_schedule/models/event_model.dart';
+import 'package:cleaning_schedule/widgets/tasks_widget.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cleaning_schedule/models/event_model.dart';
 
-class CreatedEventPage extends StatefulWidget {
-  const CreatedEventPage({super.key});
+class EventFormPage extends StatefulWidget {
+  final String? eventId; // null = création, non-null = édition
+  const EventFormPage({super.key, this.eventId});
 
   @override
-  State<CreatedEventPage> createState() => _CreatedEventPageState();
+  State<EventFormPage> createState() => _EventFormPageState();
 }
 
-class _CreatedEventPageState extends State<CreatedEventPage> {
+class _EventFormPageState extends State<EventFormPage> {
   final _formKey = GlobalKey<FormState>();
 
   final CollectionReference eventsRef = FirebaseFirestore.instance.collection(
@@ -23,27 +25,81 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
     'workers',
   );
 
-  DateTime? _selectedDate;
-  String _timeSlot = 'morning';
-  String? _selectedPlace;
-  List<String> _selectedSubPlaces = [];
-  String _task = '';
-  List<String> _selectedWorkers = [];
+  bool _loading = true;
+  final TasksWidget tasksWidget = TasksWidget();
 
+  // ✅ Tasks
+  // List<String> tasksWeekly = [
+  //   'Nettoyage bureaux',
+  //   'Entretien jardin',
+  //   'Lavage vitres',
+  // ];
+  // List<String> tasksNoWeekly = ['Grand ménage', 'Nettoyage après événement'];
+
+  // 🔹 Lieux / sous-lieux / workers
   List<Map<String, dynamic>> _places = [];
   Map<String, List<String>> _subPlacesMap = {};
   List<Map<String, dynamic>> _workers = [];
 
+  // 🔹 Champs formulaire
+  DateTime? _selectedDate;
+  String _timeSlot = 'morning';
+  String? _selectedPlace;
+  List<String> _selectedSubPlaces = [];
+  String? _selectedTask;
+  bool _isWeeklyTask = true;
+  List<String> _selectedWorkers = [];
+
+  late bool _isEditing;
+
   @override
   void initState() {
     super.initState();
-    _loadPlaces();
-    _loadWorkers();
+    _isEditing = widget.eventId != null;
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    await _loadPlaces();
+    if (_isEditing) await _loadEventData();
+    await _loadWorkers();
+    if(!mounted) return;
+    setState(() => _loading = false);
+  }
+
+  Future<void> _loadEventData() async {
+    if (widget.eventId == null) return;
+    final doc = await eventsRef.doc(widget.eventId).get();
+    if (!doc.exists) return;
+
+    final data = doc.data() as Map<String, dynamic>;
+    if(!mounted) return;
+    setState(() {
+      _selectedDate = (data['day'] as Timestamp).toDate();
+      _timeSlot = data['timeSlot'] ?? 'morning';
+      _selectedPlace = data['place'];
+      _selectedTask = data['task'];
+      _selectedWorkers = List<String>.from(data['workerIds'] ?? []);
+      _isWeeklyTask = data['isWeeklyTask'] ?? false;
+
+      final subPlaceData = data['subPlace'];
+      if (subPlaceData is List) {
+        _selectedSubPlaces = List<String>.from(subPlaceData);
+      } else if (subPlaceData is String) {
+        _selectedSubPlaces = subPlaceData
+            .replaceAll(RegExp(r'[\[\]]'), '')
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+      }
+
+      _isWeeklyTask = tasksWidget.tasksWeekly.contains(_selectedTask);
+    });
   }
 
   Future<void> _loadPlaces() async {
     final snapshot = await placesRef.get();
-
     List<Map<String, dynamic>> loadedPlaces = [];
     Map<String, List<String>> loadedSubPlaces = {};
 
@@ -57,13 +113,13 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
           .get();
       final subPlaces = roomsSnapshot.docs
           .map((r) => (r.data()['name'] ?? '').toString().trim())
-          .where((name) => name.isNotEmpty)
+          .where((n) => n.isNotEmpty)
           .toList();
 
       loadedPlaces.add({'id': doc.id, 'name': placeName});
       loadedSubPlaces[placeName] = subPlaces;
     }
-
+    if(!mounted) return;
     setState(() {
       _places = loadedPlaces;
       _subPlacesMap = loadedSubPlaces;
@@ -83,34 +139,29 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
       };
     }).toList();
 
-    // 🔹 Récupérer tous les événements du même jour
+    // 🔹 Vérifie qui est occupé sur ce jour et créneau
     Set<String> busyWorkerIds = {};
     if (_selectedDate != null) {
       final eventsSnapshot = await eventsRef
           .where('day', isEqualTo: Timestamp.fromDate(_selectedDate!))
           .get();
-
       for (var doc in eventsSnapshot.docs) {
+        if (_isEditing && doc.id == widget.eventId) continue;
         final data = doc.data() as Map<String, dynamic>;
         final timeSlot = data['timeSlot'] ?? '';
         if (timeSlot == _timeSlot) {
-          final ids = List<String>.from(data['workerIds'] ?? []);
-          busyWorkerIds.addAll(ids);
+          busyWorkerIds.addAll(List<String>.from(data['workerIds'] ?? []));
         }
       }
     }
 
-    // 🔹 Ajoute la propriété isBusy et trie par nom
     workersList = workersList.map((w) {
       return {...w, 'isBusy': busyWorkerIds.contains(w['id'])};
     }).toList();
 
-    // ✅ Tri alphabétique par nom
     workersList.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
-
-    setState(() {
-      _workers = workersList;
-    });
+    if(!mounted) return;
+    setState(() => _workers = workersList);
   }
 
   int _getWeekNumber(DateTime date) {
@@ -130,56 +181,113 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
       );
       return;
     }
-
     _formKey.currentState?.save();
 
     final event = EventModel(
-      id: '',
+      id: widget.eventId ?? '',
       day: _selectedDate!,
       timeSlot: _timeSlot,
       place: _selectedPlace!,
       subPlace: _selectedSubPlaces.toString(),
-      task: _task,
+      task: _selectedTask ?? '',
       workerIds: _selectedWorkers,
       createdAt: Timestamp.now(),
       weekNumber: _getWeekNumber(_selectedDate!),
+      isWeeklyTask: _isWeeklyTask,
     );
 
-    await eventsRef.add(event.toFirestore());
-    await _loadWorkers();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Événement créé avec succès ✅')),
-      );
-      Navigator.of(context).pop();
+    if (_isEditing && widget.eventId != null) {
+      await eventsRef.doc(widget.eventId).update(event.toFirestore());
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Événement mis à jour ✅')));
+    } else {
+      await eventsRef.add(event.toFirestore());
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Événement créé ✅')));
+    }
+
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _deleteEvent() async {
+    if (!_isEditing || widget.eventId == null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Supprimer l’événement'),
+        content: const Text('Voulez-vous vraiment supprimer cet événement ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await eventsRef.doc(widget.eventId).delete();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Événement supprimé 🗑️')));
+      Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+    // ✅ Liste sécurisée pour Dropdown afin d’éviter AssertionError
+    final allTasks = [...tasksWidget.tasksWeekly, ...tasksWidget.tasksNoWeekly];
+    final taskItems = allTasks.toSet().toList();
+    if (_selectedTask != null && !taskItems.contains(_selectedTask)) {
+      taskItems.add(_selectedTask!);
+    }
+
     return SafeArea(
       child: Scaffold(
-        appBar: AppBar(title: const Text('Créer un événement')),
+        appBar: AppBar(
+          title: Text(
+            _isEditing ? 'Modifier l’événement' : 'Créer un événement',
+          ),
+          actions: [
+            if (_isEditing)
+              IconButton(
+                icon: const Icon(Icons.delete),
+                color: Colors.red,
+                onPressed: _deleteEvent,
+              ),
+          ],
+        ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Form(
             key: _formKey,
             child: Column(
               children: [
-                // 📅 Sélection de date
+                // 📅 Date
                 ListTile(
                   title: Text(
                     _selectedDate == null
                         ? 'Sélectionner une date'
-                        : 'Date: ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                        : 'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}',
                   ),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: () async {
                     final date = await showDatePicker(
                       context: context,
                       initialDate: _selectedDate ?? DateTime.now(),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
                     );
                     if (date != null) {
                       setState(() => _selectedDate = date);
@@ -188,8 +296,8 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
                   },
                 ),
                 const SizedBox(height: 16),
-      
-                // 🕓 Tranche horaire
+
+                // 🕓 Créneau
                 Row(
                   children: [
                     Expanded(
@@ -217,9 +325,10 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-      
+
                 // 📍 Lieu
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Lieu',
                     border: OutlineInputBorder(),
@@ -235,14 +344,14 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
                   value: _selectedPlace,
                   onChanged: (v) {
                     setState(() {
-                      _selectedPlace = v?.toString().trim();
+                      _selectedPlace = v;
                       _selectedSubPlaces = [];
                     });
                   },
                   validator: (v) => v == null ? 'Sélectionner un lieu' : null,
                 ),
                 const SizedBox(height: 16),
-      
+
                 // 🏠 Sous-lieux
                 if (_selectedPlace != null &&
                     (_subPlacesMap[_selectedPlace!] ?? []).isNotEmpty)
@@ -253,19 +362,20 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
                     ),
                     child: Wrap(
                       spacing: 8,
-                      children: (_subPlacesMap[_selectedPlace!] ?? []).map((sub) {
+                      children: (_subPlacesMap[_selectedPlace!] ?? []).map((
+                        sub,
+                      ) {
                         final isSelected = _selectedSubPlaces.contains(sub);
                         return FilterChip(
                           label: Text(sub),
                           selected: isSelected,
                           selectedColor: Colors.blue.shade100,
-                          onSelected: (selected) {
+                          onSelected: (v) {
                             setState(() {
-                              if (selected) {
+                              if (v)
                                 _selectedSubPlaces.add(sub);
-                              } else {
+                              else
                                 _selectedSubPlaces.remove(sub);
-                              }
                             });
                           },
                         );
@@ -273,17 +383,56 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
                     ),
                   ),
                 const SizedBox(height: 16),
-      
+
                 // 🧹 Tâche
-                TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'Tâche (optionnelle)',
-                    border: OutlineInputBorder(),
-                  ),
-                  onSaved: (v) => _task = v ?? '',
-                ),
+                // 🧹 Tâche
+DropdownButtonFormField<String>(
+  isExpanded: true,
+  decoration: const InputDecoration(
+    labelText: 'Tâche (optionnelle)',
+    border: OutlineInputBorder(),
+  ),
+  value: _selectedTask,
+  items: [
+    const DropdownMenuItem<String>(
+      value: '', // valeur vide pour "aucune tâche"
+      child: Text('Aucune tâche', style: TextStyle(color: Colors.grey),),
+    ),
+    const DropdownMenuItem<String>(
+      enabled: false,
+      child: Text('— Tâches hebdomadaires ',
+          style: TextStyle(fontWeight: FontWeight.normal, color: Colors.grey)),
+    ),
+    ...([...tasksWidget.tasksWeekly]..sort())
+        .map((task) => DropdownMenuItem(value: task, child: Text(task)))
+        .toList(),
+    const DropdownMenuItem<String>(
+      enabled: false,
+      child: Text('— Tâches non hebdomadaires ',
+          style: TextStyle(fontWeight: FontWeight.normal, color: Colors.grey)),
+    ),
+    ...([...tasksWidget.tasksNoWeekly]..sort())
+        .map((task) => DropdownMenuItem(value: task, child: Text(task)))
+        .toList(),
+  ],
+  onChanged: (value) {
+  setState(() {
+    _selectedTask = value;
+    if (_selectedTask == null || _selectedTask!.isEmpty) {
+      _isWeeklyTask = true;
+    } else if (tasksWidget.tasksWeekly.contains(_selectedTask)) {
+      _isWeeklyTask = true;
+    } else {
+      _isWeeklyTask = false;
+    }
+  });
+},
+
+),
+
+
                 const SizedBox(height: 16),
-      
+
                 // 👷 Workers
                 _workers.isEmpty
                     ? const CircularProgressIndicator()
@@ -297,136 +446,77 @@ class _CreatedEventPageState extends State<CreatedEventPage> {
                           ..._workers.map((w) {
                             final isBusy = w['isBusy'] ?? false;
                             final isAbcent = w['isAbcent'] ?? false;
-      
-                            // 🔹 Jour et créneau pour le schedule
+
                             final dayName = _selectedDate != null
                                 ? DateFormat(
                                     'EEEE',
                                     'fr_FR',
                                   ).format(_selectedDate!)
                                 : '';
-      
                             final workDay =
                                 w['workSchedule']?[dayName.toLowerCase()] ?? {};
-      
-                            // 🔹 Vérifie si le worker travaille ce créneau
                             final worksThisSlot = _timeSlot == 'morning'
                                 ? (workDay['worksMorning'] ?? true)
                                 : (workDay['worksAfternoon'] ?? true);
-      
-                            // 🔹 Horaires aménagés (endTime défini et non vide)
                             final hasSpecialSchedule =
                                 workDay['endTime'] != null &&
                                 workDay['endTime'].toString().isNotEmpty;
-                            return InkWell(
-                              onLongPress: isBusy
-                                  ? () async {
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title: Text('Worker occupé'),
-                                          content: Text(
-                                            'Voulez-vous assigner ${w['name']} à cet événement quand même ?',
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(ctx, false),
-                                              child: const Text('Annuler'),
-                                            ),
-                                            ElevatedButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(ctx, true),
-                                              child: const Text('Oui'),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-      
-                                      if (confirm == true) {
-                                        await FirebaseFirestore.instance
-                                            .collection('events')
-                                            .add({
-                                              'day': Timestamp.fromDate(
-                                                _selectedDate!,
-                                              ),
-                                              'timeSlot': _timeSlot,
-                                              'place': _selectedPlace,
-                                              'subPlace': _selectedSubPlaces,
-                                              'task': _task,
-                                              'workerIds': [w['id']],
-                                              'createdAt': Timestamp.now(),
-                                              'updatedAt': Timestamp.now(),
-                                            });
-      
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              '${w['name']} assigné à un nouvel événement ✅',
-                                            ),
-                                          ),
-                                        );
-      
-                                        _loadWorkers(); // Rafraîchir la liste
-                                      }
-                                    }
-                                  : null,
-                              child: CheckboxListTile(
-                                title: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        w['name'],
-                                        style: TextStyle(
-                                          color:
-                                              (!worksThisSlot ||
-                                                  isAbcent ||
-                                                  isBusy)
-                                              ? Colors.grey
-                                              : null,
-                                          decoration: isBusy
-                                              ? TextDecoration.lineThrough
-                                              : null,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+
+                            return CheckboxListTile(
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      w['name'],
+                                      style: TextStyle(
+                                        color:
+                                            (!worksThisSlot ||
+                                                isAbcent ||
+                                                isBusy)
+                                            ? Colors.grey
+                                            : null,
+                                        decoration: isBusy
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (hasSpecialSchedule)
+                                    const Padding(
+                                      padding: EdgeInsets.only(left: 5),
+                                      child: Icon(
+                                        Icons.access_time,
+                                        size: 16,
+                                        color: Colors.orange,
                                       ),
                                     ),
-                                    if (hasSpecialSchedule)
-                                      const Padding(
-                                        padding: EdgeInsets.only(left: 5),
-                                        child: Icon(
-                                          Icons.access_time,
-                                          size: 16,
-                                          color: Colors.orange,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                value: _selectedWorkers.contains(w['id']),
-                                onChanged: (!worksThisSlot || isAbcent || isBusy)
-                                    ? null
-                                    : (v) {
-                                        setState(() {
-                                          if (v == true) {
-                                            _selectedWorkers.add(w['id']);
-                                          } else {
-                                            _selectedWorkers.remove(w['id']);
-                                          }
-                                        });
-                                      },
+                                ],
                               ),
+                              value: _selectedWorkers.contains(w['id']),
+                              onChanged: (!worksThisSlot || isAbcent || isBusy)
+                                  ? null
+                                  : (v) {
+                                      setState(() {
+                                        if (v == true)
+                                          _selectedWorkers.add(w['id']);
+                                        else
+                                          _selectedWorkers.remove(w['id']);
+                                      });
+                                    },
                             );
                           }).toList(),
                         ],
                       ),
-      
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _submitForm,
-                  child: const Text('Créer l’événement'),
+                  child: Text(
+                    _isEditing
+                        ? 'Enregistrer les modifications'
+                        : 'Créer l’événement',
+                  ),
                 ),
               ],
             ),

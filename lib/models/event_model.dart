@@ -10,6 +10,7 @@ class EventModel {
   final List<String> workerIds;
   final Timestamp createdAt;
   final int weekNumber;
+  final bool isWeeklyTask; // ✅ nouveau
 
   EventModel({
     required this.id,
@@ -21,6 +22,7 @@ class EventModel {
     required this.workerIds,
     required this.createdAt,
     required this.weekNumber, 
+    required this.isWeeklyTask, // ✅ nouveau
   });
 
   Map<String, dynamic> toFirestore() => {
@@ -32,6 +34,7 @@ class EventModel {
         'workerIds': workerIds,
         'createdAt': createdAt,
         'weekNumber': weekNumber,
+        'isWeeklyTask': isWeeklyTask,
       };
 
   factory EventModel.fromFirestore(String id, Map<String, dynamic> data) {
@@ -45,6 +48,7 @@ class EventModel {
       workerIds: List<String>.from(data['workerIds'] ?? []),
       createdAt: data['createdAt'] ?? Timestamp.now(),
       weekNumber: data['weekNumber'] ?? 0,
+      isWeeklyTask : data['isWeeklyTask'] ?? false,
     );
   }
 }

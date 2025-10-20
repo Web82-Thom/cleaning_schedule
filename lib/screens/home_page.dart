@@ -1,19 +1,24 @@
 import 'package:cleaning_schedule/controllers/auth_controller.dart';
 import 'package:cleaning_schedule/controllers/stub_controller.dart';
 import 'package:cleaning_schedule/screens/stubPages/consommation_page.dart';
-import 'package:cleaning_schedule/screens/stubPages/divers_page.dart';
+import 'package:cleaning_schedule/screens/stubPages/view_tasks_no_weekly_page.dart';
 import 'package:cleaning_schedule/screens/stubPages/planning_page.dart';
-import 'package:cleaning_schedule/screens/stubPages/rdv_page.dart';
+import 'package:cleaning_schedule/screens/stubPages/rdv_calendar_page.dart';
 import 'package:cleaning_schedule/widgets/build_tab_item_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final FirebaseAuth auth;
+
+   HomePage({Key? key, FirebaseAuth? auth})
+      : auth = auth ?? FirebaseAuth.instance,
+        super(key: key);
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
+
 
 class _HomePageState extends State<HomePage> {
   AuthController authController = AuthController();
@@ -22,8 +27,8 @@ class _HomePageState extends State<HomePage> {
 
   final List<Widget> _pages = const [
     PlanningPage(),
-    RdvPage(),
-    DiversPage(),
+    RdvCalendarPage(),
+    ViewTasksNoWeeklyPage(),
     ConsommationPage(),
   ];
 
@@ -42,11 +47,11 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    // final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Atelier de nettoyage'),
+        title: const Text('Atelier de nettoyage', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_sharp),
@@ -68,8 +73,8 @@ class _HomePageState extends State<HomePage> {
         heroTag: null, //evite le conflit
         onPressed: () => stubController.onFabPressed(context),
         tooltip: 'Nouveau planning',
-        child: const Icon(Icons.edit),
         backgroundColor: Colors.indigo,
+        child: const Icon(Icons.edit),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       // BottomAppBar avec notch pour FAB

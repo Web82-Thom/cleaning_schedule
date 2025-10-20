@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-class AuthController {
+class AuthController extends ChangeNotifier{
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -52,6 +52,47 @@ class AuthController {
       );
     }
   }
+  
+  Map<String, String> monitorIds = {};
+  ///Chargement de tous les moniteurs
+  Future<Map<String, String>> loadMonitors() async {
+    final snapshot = await _db
+        .collection('users')
+        .where('role', isEqualTo: 'instructor')
+        .where('actif', isEqualTo: true)
+        .get();
+
+    return monitorIds = {
+      for (var doc in snapshot.docs)
+        doc.id: '${doc['prenom']} ${doc['nom']}',
+    };
+  }
+
+  //  Charge la liste des moniteurs (instructors) actifs depuis Firestore
+  Future<Map<String, String>> loadMonitorsMap() async {
+    final Map<String, String> monitorsMap = {};
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'instructor')
+          .where('actif', isEqualTo: true)
+          .get();
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final nom = data['nom'] ?? '';
+        final prenom = data['prenom'] ?? '';
+        monitorsMap[doc.id] = '$prenom $nom';
+      }
+    } catch (e) {
+      debugPrint('Erreur chargement des moniteurs: $e');
+    }
+
+    return monitorsMap;
+  }
+
+
 
   // --- Connexion : vérifie le rôle avant d'autoriser l’accès
   Future<void> signIn({

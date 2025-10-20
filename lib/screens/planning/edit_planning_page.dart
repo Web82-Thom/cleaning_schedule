@@ -28,6 +28,13 @@ class _EditPlanningPageState extends State<EditPlanningPage> {
               color: Colors.orange.shade100,
               onTap: () => Navigator.pushNamed(context, '/createdPlanning'),
             ),
+            _buildCard(
+              icon: Icons.calendar_today,
+              title: "Gestions des taches non hebdomadaire",
+              description: "Listing par date",
+              color: Colors.red.shade100,
+              onTap: () => Navigator.pushNamed(context, '/listEventsNoWeekly'),
+            ),
             const SizedBox(height: 12),
             _buildCard(
               icon: Icons.location_city,
@@ -73,7 +80,7 @@ class _EditPlanningPageState extends State<EditPlanningPage> {
                 backgroundColor: Colors.white,
                 child: Icon(icon, color: Colors.indigo, size: 30),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 15),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,7 +88,7 @@ class _EditPlanningPageState extends State<EditPlanningPage> {
                     Text(
                       title,
                       style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold),
+                          fontSize: 15, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 6),
                     Text(

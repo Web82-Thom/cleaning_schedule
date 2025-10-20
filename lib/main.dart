@@ -1,12 +1,14 @@
+import 'package:cleaning_schedule/screens/planning/event_from_page.dart';
+import 'package:cleaning_schedule/screens/planning/list_tasks_no_weekly_page.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 import 'package:cleaning_schedule/screens/instructors/instructor_profile_page.dart';
 import 'package:cleaning_schedule/screens/places/list_place_page.dart';
-import 'package:cleaning_schedule/screens/planning/created_event_page.dart';
 import 'package:cleaning_schedule/screens/workers/list_workers_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -14,10 +16,14 @@ import 'firebase_options.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/home_page.dart';
 
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('fr_FR', null);
+  // Bloquer l'app en portrait uniquement
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
   try {
     if (kIsWeb) {
@@ -85,13 +91,12 @@ class CleaningScheduleApp extends StatelessWidget {
         ),
         home: const AuthWrapper(),
         routes: {
-        '/listPlace': (context) => const ListPlace(),
-        '/workers': (context) => const ListWorkersPage(),
-        '/createdPlanning': (context) => const CreatedEventPage(),
-        '/profileInstructor' : (context) => const InstructorProfilePage()
-
-        // '/detailsPlace': (context) => const DetailsPlacePage(),
-},
+          '/listPlace': (context) => const ListPlace(),
+          '/workers': (context) => const ListWorkersPage(),
+          '/createdPlanning': (context) => const EventFormPage(),
+          '/profileInstructor': (context) => const InstructorProfilePage(),
+          '/listEventsNoWeekly': (context) => NoWeeklyTasksPage(),
+        },
       ),
     );
   }
@@ -109,7 +114,7 @@ class AuthWrapper extends StatelessWidget {
     if (user == null) {
       return const LoginPage();
     } else {
-      return const HomePage();
+      return HomePage();
     }
   }
 }
