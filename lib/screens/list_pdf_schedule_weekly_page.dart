@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 
-class ListPdfPage extends StatefulWidget {
-  const ListPdfPage({super.key});
+class ListPdfScheduleWeeklyPage extends StatefulWidget {
+  const ListPdfScheduleWeeklyPage({super.key});
 
   @override
-  State<ListPdfPage> createState() => _ListPdfPageState();
+  State<ListPdfScheduleWeeklyPage> createState() => _ListPdfScheduleWeeklyPageState();
 }
 
-class _ListPdfPageState extends State<ListPdfPage> {
+class _ListPdfScheduleWeeklyPageState extends State<ListPdfScheduleWeeklyPage> {
   List<FileSystemEntity> _pdfFiles = [];
 
   @override
@@ -20,18 +20,32 @@ class _ListPdfPageState extends State<ListPdfPage> {
   }
 
   Future<void> _loadPdfFiles() async {
+  try {
     final dir = await getApplicationDocumentsDirectory();
-    final files = Directory(dir.path)
+    final categoryDir = Directory('${dir.path}/scheduleWeeklyCategory');
+
+    // Crée le dossier s'il n'existe pas
+    if (!await categoryDir.exists()) {
+      await categoryDir.create(recursive: true);
+    }
+
+    // Liste les fichiers PDF
+    final files = categoryDir
         .listSync()
-        .where((f) => f.path.endsWith('.pdf'))
+        .where((f) => f is File && f.path.endsWith('.pdf'))
+        .map((f) => f as File)
         .toList()
       ..sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
 
     if (!mounted) return;
+
     setState(() {
       _pdfFiles = files;
     });
+  } catch (e) {
+    debugPrint('Erreur lors du chargement des PDF: $e');
   }
+}
 
   @override
   Widget build(BuildContext context) {

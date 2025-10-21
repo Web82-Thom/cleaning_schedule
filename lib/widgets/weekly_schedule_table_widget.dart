@@ -1,7 +1,7 @@
 import 'package:cleaning_schedule/controllers/pdf_controller.dart';
 import 'package:cleaning_schedule/controllers/schedule_controller.dart';
 import 'package:cleaning_schedule/controllers/workers_controller.dart';
-import 'package:cleaning_schedule/screens/list_pdf_page.dart';
+import 'package:cleaning_schedule/screens/list_pdf_schedule_weekly_page.dart';
 import 'package:cleaning_schedule/screens/planning/event_from_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -259,7 +259,7 @@ class _WeeklyScheduleTableWidgetState extends State<WeeklyScheduleTableWidget> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ListPdfPage()),
+                      MaterialPageRoute(builder: (_) => const ListPdfScheduleWeeklyPage()),
                     );
                   },
                 ),

@@ -1,3 +1,6 @@
+import 'package:cleaning_schedule/screens/consumables/list_pdf_cars_page.dart';
+import 'package:cleaning_schedule/screens/consumables/list_pdf_products_page.dart';
+import 'package:cleaning_schedule/screens/list_pdf_schedule_weekly_page.dart';
 import 'package:cleaning_schedule/screens/planning/event_from_page.dart';
 import 'package:cleaning_schedule/screens/planning/list_tasks_no_weekly_page.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -18,6 +21,9 @@ import 'screens/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Affiche juste la barre du haut, cache la navigation, et garde le sticky
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [SystemUiOverlay.top]);
+
   await initializeDateFormatting('fr_FR', null);
   // Bloquer l'app en portrait uniquement
   await SystemChrome.setPreferredOrientations([
@@ -96,6 +102,9 @@ class CleaningScheduleApp extends StatelessWidget {
           '/createdPlanning': (context) => const EventFormPage(),
           '/profileInstructor': (context) => const InstructorProfilePage(),
           '/listEventsNoWeekly': (context) => NoWeeklyTasksPage(),
+          '/listPdfProducts' : (context) => ListPdfProductsPage(),
+          '/listPdfScheduleWeekly': (context) => ListPdfScheduleWeeklyPage(),
+          '/listPdfCars': (context) => const ListPdfCarsPage(),
         },
       ),
     );
