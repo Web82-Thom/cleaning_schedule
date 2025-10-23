@@ -47,9 +47,11 @@ class AuthController extends ChangeNotifier{
         Navigator.pop(context); 
       }
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? 'Erreur d’inscription')),
       );
+      }
     }
   }
   
@@ -92,8 +94,6 @@ class AuthController extends ChangeNotifier{
     return monitorsMap;
   }
 
-
-
   // --- Connexion : vérifie le rôle avant d'autoriser l’accès
   Future<void> signIn({
     required String email,
@@ -114,13 +114,17 @@ class AuthController extends ChangeNotifier{
       }
 
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? 'Erreur de connexion')),
       );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
+      }
     }
   }
 

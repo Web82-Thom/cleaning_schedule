@@ -72,8 +72,9 @@ class _RdvCalendarPageState extends State<RdvCalendarPage> {
 
   String getRdvLabel(RdvModel rdv) {
     if (rdv.workerId == "TEAM") return "Équipe";
-    if (rdv.workerId.isNotEmpty)
+    if (rdv.workerId.isNotEmpty) {
       return _workersController.workersMap[rdv.workerId] ?? "Inconnu";
+    }
     if (rdv.monitorIds.isNotEmpty) return "Moniteur(s)";
     return "Inconnu";
   }

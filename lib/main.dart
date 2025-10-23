@@ -1,8 +1,9 @@
 import 'package:cleaning_schedule/screens/consumables/list_pdf_cars_page.dart';
-import 'package:cleaning_schedule/screens/consumables/list_pdf_products_page.dart';
+import 'package:cleaning_schedule/screens/consumables/widgets/list_pdf_page.dart';
 import 'package:cleaning_schedule/screens/list_pdf_schedule_weekly_page.dart';
 import 'package:cleaning_schedule/screens/planning/event_from_page.dart';
 import 'package:cleaning_schedule/screens/planning/list_tasks_no_weekly_page.dart';
+import 'package:cleaning_schedule/screens/planning/to_do_list_page.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 import 'package:cleaning_schedule/screens/instructors/instructor_profile_page.dart';
@@ -37,26 +38,42 @@ Future<void> main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      print('✅ Firebase initialized on Web');
     } else if (Platform.isWindows) {
       // ✅ WINDOWS
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      print('✅ Firebase Core initialized on Windows (Auth disabled)');
     } else {
       // ✅ MOBILE (Android / iOS / macOS / Linux)
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      print('✅ Firebase initialized on ${Platform.operatingSystem}');
     }
-  } catch (e) {
-    print('❌ Firebase initialization failed: $e');
+  } catch (e, stack) {
+    debugPrint('🔥 Erreur lors de l’initialisation de Firebase : $e');
+    debugPrintStack(stackTrace: stack);
+
+    // En cas d’erreur critique, afficher une UI minimale
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Text(
+              'Erreur d’initialisation Firebase.\n$e',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ),
+      ),
+    );
+    return; // stoppe l’exécution ici
   }
 
   runApp(const CleaningScheduleApp());
 }
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class CleaningScheduleApp extends StatelessWidget {
   const CleaningScheduleApp({super.key});
@@ -72,6 +89,7 @@ class CleaningScheduleApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         title: 'Cleaning Schedule',
         locale: const Locale('fr', 'FR'),
         supportedLocales: const [
@@ -102,9 +120,14 @@ class CleaningScheduleApp extends StatelessWidget {
           '/createdPlanning': (context) => const EventFormPage(),
           '/profileInstructor': (context) => const InstructorProfilePage(),
           '/listEventsNoWeekly': (context) => NoWeeklyTasksPage(),
-          '/listPdfProducts' : (context) => ListPdfProductsPage(),
           '/listPdfScheduleWeekly': (context) => ListPdfScheduleWeeklyPage(),
           '/listPdfCars': (context) => const ListPdfCarsPage(),
+          '/toDoListPage' : (context) => const ToDoListPage(),
+          '/listPdfHomeOfLife': (_) => const ListPdfPage(),
+          '/listPdfTransfer': (_) => const ListPdfPage(),
+          '/listPdfVillas' : (_) => const ListPdfPage(),
+          '/listPdfOtherPlaces' : (_) => const ListPdfPage(),
+          '/listPdfProducts' : (context) => ListPdfPage(),
         },
       ),
     );

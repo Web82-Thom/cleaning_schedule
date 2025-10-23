@@ -7,7 +7,54 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:open_filex/open_filex.dart';
 
 class PdfController extends ChangeNotifier {
-  /// Génère le PDF du planning hebdomadaire
+  /// ______________________________________
+  ///|--------Function generaliser----------|
+  ///|______________________________________|
+  /// Supprime un PDF avec confirmation
+  Future<void> deletePdfFromCategory({
+    required BuildContext context,
+    required File file,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer le PDF'),
+        content: Text('Voulez-vous vraiment supprimer ${file.path.split('/').last} ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      if (await file.exists()) {
+        await file.delete();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('PDF supprimé : ${file.path.split('/').last} ✅')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de la suppression : $e')),
+        );
+      }
+    }
+  }
+  ///___________________________________________________
+  ///|------Génère le PDF du planning hebdomadaire------|
+  ///|__________________________________________________|
   static Future<void> generateWeeklyPdf({
     required List<Map<String, dynamic>> events,
     required Map<String, String> workersMap,
@@ -210,7 +257,6 @@ class PdfController extends ChangeNotifier {
     final file = File('${categoryDir.path}/$productName.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
     notifyListeners();
-    print('PDF généré : ${file.path}');
     return file;
   }
 
@@ -265,7 +311,6 @@ class PdfController extends ChangeNotifier {
     );
   }
 }
-
 
   //____________________________________________________ 
   //|   ---------------CARS------------------------     |
@@ -355,7 +400,6 @@ class PdfController extends ChangeNotifier {
     final file = File('${categoryDir.path}/$cleanName');
     await file.writeAsBytes(pdfBytes, flush: true);
 
-    print('PDF généré : ${file.path}');
     notifyListeners();
     return file;
   }

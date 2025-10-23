@@ -110,7 +110,7 @@ class _TableDateTaskNoWeeklyWidgetState
                           vertical: 10, horizontal: 8),
                       decoration: BoxDecoration(
                         color: late
-                            ? Colors.red.withOpacity(0.1)
+                            ? Colors.red.withValues(alpha: 0.1)
                             : Colors.transparent,
                         border: Border(
                           bottom: BorderSide(color: Colors.grey.shade300),

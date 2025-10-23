@@ -174,15 +174,17 @@ class WorkersController extends ChangeNotifier {
     );
 
     if (confirm != true) return;
-
-    await workersRef.doc(id).delete();
+    if (confirm != true) return;
+    
+      await workersRef.doc(id).delete();
+    
     Navigator.pop(context, true);
 
-    if (context.mounted) {
+    if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Travailleur supprimé ❌')));
-    }
+    
   }
 
   /// ➕ Ajouter un travailleur
@@ -202,7 +204,7 @@ class WorkersController extends ChangeNotifier {
 
     try {
       // Calcul dynamique de isFullTime
-      final _isFullTime = !_isPartTime && !_isTherapeutic && !_isHalfTime;
+      final isFullTime = !_isPartTime && !_isTherapeutic && !_isHalfTime;
 
       await workersRef.add({
         'firstName': firstName[0].toUpperCase() + firstName.substring(1),
@@ -212,7 +214,7 @@ class WorkersController extends ChangeNotifier {
         'isPartTime': _isPartTime,
         'isTherapeutic': _isTherapeutic,
         'isHalfTime': _isHalfTime,
-        'isFullTime': _isFullTime,
+        'isFullTime': isFullTime,
         'isAbcent': _isAbcent,
         'createdAt': FieldValue.serverTimestamp(),
       });

@@ -22,12 +22,12 @@ class _CreatedPlaceState extends State<CreatedPlace> {
       'dateCreated': FieldValue.serverTimestamp(),
     });
 
-    if (context.mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Lieu ajouté avec succès")),
-      );
-    }
+    if (!mounted) return;
+
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Lieu ajouté avec succès")),
+    );
   }
 
   @override
@@ -53,7 +53,7 @@ class _CreatedPlaceState extends State<CreatedPlace> {
             SwitchListTile(
               title: const Text("Ce lieu contient des pièces"),
               value: _contientPieces,
-              activeColor: Colors.indigo,
+              activeThumbColor: Colors.indigo,
               onChanged: (value) {
                 setState(() {
                   _contientPieces = value;

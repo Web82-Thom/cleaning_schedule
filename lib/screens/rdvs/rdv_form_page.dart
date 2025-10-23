@@ -17,8 +17,8 @@ class RdvFormPage extends StatefulWidget {
     this.initialDate,
     this.workersMap,
     this.monitorsMap,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   State<RdvFormPage> createState() => _RdvFormPageState();
@@ -168,7 +168,7 @@ class _RdvFormPageState extends State<RdvFormPage> {
                         ),
                       )
                       .toList(),
-                  value: isTeam ? null : selectedWorkerId,
+                  initialValue: isTeam ? null : selectedWorkerId,
                   onChanged: isTeam
                       ? null
                       : (value) {

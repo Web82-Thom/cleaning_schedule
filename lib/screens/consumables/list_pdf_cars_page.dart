@@ -63,7 +63,7 @@ class _ListPdfCarsPageState extends State<ListPdfCarsPage> {
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       await pdfController.deletePdfFromCarsCategory(context, fileName);
       _loadPdfFiles(); // rechargement de la liste
     }

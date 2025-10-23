@@ -162,7 +162,7 @@ class _DetailsCarsPageState extends State<DetailsCarsPage> {
 
                         if (confirmed == true) {
                           // 🔹 Construction automatique des données à exporter
-                          final _records = List.generate(
+                          final records = List.generate(
                             months.length,
                             (i) => {
                               'month': months[i],
@@ -172,7 +172,7 @@ class _DetailsCarsPageState extends State<DetailsCarsPage> {
                             },
                           );
 
-                          await pdfController.generateListCarByNamePdf(widget.carName, _records);
+                          await pdfController.generateListCarByNamePdf(widget.carName, records);
 
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -186,8 +186,6 @@ class _DetailsCarsPageState extends State<DetailsCarsPage> {
                       TextButton(
                       onPressed: () {
                         Navigator.pushNamed(context, '/listPdfCars');
-                        print('open list');
-                        
                       },
                       child: Text('list pdf'),
                     ),

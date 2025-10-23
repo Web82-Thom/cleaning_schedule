@@ -14,9 +14,9 @@ class TasksWidget extends ChangeNotifier{
     'Vitres', 
     'Lessivage portes',
     'Poussières',
-    'Faîences',
+    'Faïences',
     'Remise en Etat',
     'Décapage',
-    'Toiles d\'araigner',
+    'Toiles d\'araignée',
     ];
 }
